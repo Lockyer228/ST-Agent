@@ -5,8 +5,14 @@ architecture-version: 1
 approved-at: 2026-09-05T21:38:27+08:00
 owner: Aria Qiao
 upstream: Approved product baseline C-025; architecture boundary C-026; joint approval C-029
-last_reviewed: 2026-09-05
+last_reviewed: 2026-09-06
+amended: 2026-09-06 — user decision C-2026-09-06 (B-AI development model provider)
 ---
+
+---
+
+> **Amendment — 2026-09-06 (user decision, product owner)**
+> Development model provider changed from Amazon Bedrock to **B-AI** (OpenAI-compatible, `https://api.b.ai/v1`). Strands keeps its provider loop and connects via its OpenAI-compatible provider adapter. Authorized model list (use any actually available; auto-fallback, no new user confirmation): `hy3` (default start, not forced), `mimo-v2.5`, `glm-5.3-flash`, `qwen3.8-flash`. Dev credentials and full config: `project/Collaboration/b-ai-development-provider.env` (plaintext per user instruction; never committed to the product repository). The former `bedrock-credentials-missing` blocker is void; model selection is an authorized implementation decision. Where this document names "Bedrock"/"AWS" for the development model provider, the B-AI provider above is the effective configuration. Architecture boundaries, scope, and product behavior otherwise unchanged.
 
 # Technical Architecture
 
@@ -27,7 +33,7 @@ flowchart LR
     U[Creator] <--> UI[Streamlit UI]
     UI --> CC[Case Controller]
     CC --> AR[Strands Agent Runtime]
-    AR <--> BR[Amazon Bedrock]
+    AR <--> BR[B-AI (OpenAI-compatible)]
     AR <--> TF[Bounded Tool Facade]
     TF --> WS[Workspace Service]
     TF --> CP[Content Pipeline]
@@ -43,7 +49,7 @@ flowchart LR
     OUT --> UI
 ```
 
-All components run in the Streamlit process for P0. Amazon Bedrock and the allowlisted official format sources are the only required network integrations.
+All components run in the Streamlit process for P0. B-AI (development model provider via OpenAI-compatible API) and the allowlisted official format sources are the only required network integrations.
 
 ## 3. Proposed Technology Baseline
 
@@ -51,9 +57,9 @@ All components run in the Streamlit process for P0. Amazon Bedrock and the allow
 | --- | --- | --- |
 | Language | Python 3.12 | Supported by the Python SDK and well suited to Streamlit, image processing, schemas, and local files |
 | Primary platform | Windows development environment | Cursor performs all implementation and acceptance work there; paths and instructions must work in that environment |
-| Agent framework | `strands-agents` Python SDK | Provides the agent loop, Amazon Bedrock integration, custom tools, structured output, hooks, and metrics |
-| Model provider | Amazon Bedrock through `BedrockModel` | Keeps the product implementation centered on AWS and avoids a separate provider integration |
-| Initial model | `global.anthropic.claude-sonnet-4-6`, configurable by environment | Current Strands quickstart baseline; final lock depends on access, quality, latency, and cost checks |
+| Agent framework | `strands-agents` Python SDK | Provides the agent loop, model-provider integration (OpenAI-compatible / other adapters), custom tools, structured output, hooks, and metrics |
+| Model provider | B-AI (OpenAI-compatible, `https://api.b.ai/v1`) via the Strands OpenAI-compatible provider adapter | Changed from Amazon Bedrock by user decision 2026-09-06; keeps a single provider integration |
+| Initial model | B-AI `hy3` default; authorized list `hy3` / `mimo-v2.5` / `glm-5.3-flash` / `qwen3.8-flash`, configurable by environment | User-authorized 2026-09-06; final lock depends on access, quality, latency, and cost checks |
 | UI | Streamlit | One local page can handle chat, upload, progress, resume, and downloads |
 | Data models | Pydantic | Validates case state, agent turn outcomes, canonical content, and format inputs |
 | JSON validation | Pydantic plus targeted JSON Schema/custom validators | The ST implementation profile contains rules that generic schema validation alone cannot express |
@@ -307,7 +313,7 @@ The agent invocation runs synchronously in the Streamlit request. No background 
 - Imported text, JSON, and card content are delimited as untrusted creative material. Instructions inside them cannot add tools, change permissions, or override product rules.
 - The agent has no shell, arbitrary HTTP, general file editor, dynamic MCP, or code-execution tool.
 - AWS credentials use the standard AWS credential provider chain and are never written to a case, log, prompt, or repository.
-- User content is sent to the configured Bedrock model as required for creation. The UI and README disclose that dependency plainly.
+- User content is sent to the configured model (B-AI) as required for creation. The UI and README disclose that dependency plainly.
 - Debug logs exclude prompt bodies, uploaded content, credentials, and hidden reasoning.
 - The shared `project/` directory is the development control plane for Plan, Collaboration, Role Configs, and Methods. It is not the product source checkout.
 - Product source lives in the authoritative Git repository and separate local working copies. Internal planning, instance bindings, and private source material remain outside the runtime package and product history.
@@ -396,8 +402,8 @@ Files may be combined when implementation proves a split unnecessary. The depend
 
 1. **Static and unit checks:** data models, path containment, atomic writes, lifecycle transitions, lineage invalidation, serializers, validators, and PNG chunk parsing.
 2. **Golden-format integration checks:** known cards and lorebooks covering new, modify, standalone, embedded, both, unknown-field preservation, and PNG read-back.
-3. **Agent integration checks:** a deterministic fake model drives Q&A, tool calls, interruption, resume, blocked states, and close cleanup without Bedrock cost.
-4. **Live model smoke checks:** a small set verifies Bedrock credentials, structured output, tool use, American English quality, latency, and the representative demo path.
+3. **Agent integration checks:** a deterministic fake model drives Q&A, tool calls, interruption, resume, blocked states, and close cleanup without model cost.
+4. **Live model smoke checks:** a small set verifies B-AI credentials, structured output, tool use, American English quality, latency, and the representative demo path.
 5. **Project-level SillyTavern acceptance:** representative generated fixtures are imported and inspected while freezing the format rules. This does not run for ordinary user cases.
 6. **Release rehearsal:** a fresh Windows install completes the representative English case within the target time and produces every documented file.
 7. **Self-containment audit:** the runtime package contains no secret or temporary user Q&A and does not depend on internal Concept or private reference files.
@@ -409,7 +415,7 @@ Files may be combined when implementation proves a split unnecessary. The depend
 - local single-process Python application;
 - Windows as the primary implementation and P0 acceptance environment;
 - one Strands agent with project-owned bounded tools;
-- Amazon Bedrock as the P0 model provider;
+- B-AI (OpenAI-compatible) as the P0 development model provider;
 - Streamlit as a thin UI;
 - product workspace files as the only recoverable case authority;
 - deterministic services for lifecycle, formats, PNG, validation, and delivery;
@@ -421,22 +427,22 @@ Files may be combined when implementation proves a split unnecessary. The depend
 - Streamlit layout and visual styling;
 - validator implementation details and small supporting libraries;
 - retry timing within the stated caps;
-- final Bedrock model ID if the initial model fails the access, cost, latency, or quality Spike without changing product behavior.
+- final B-AI model ID if the initial model fails the access, cost, latency, or quality Spike without changing product behavior.
 
 ### Required technical Spikes
 
 | Spike | Question | Passing evidence |
 | --- | --- | --- |
-| S-01 Strands runtime | Do current Bedrock invocation, custom tools, structured output, and hooks work together inside Streamlit? | One local invocation shows real tool events and a validated `TurnOutcome` |
+| S-01 Strands runtime | Do the current B-AI provider invocation, custom tools, structured output, and hooks work together inside Streamlit? | One local invocation shows real tool events and a validated `TurnOutcome` |
 | S-02 ST format and PNG | Which exact card, lorebook, and PNG chunk profiles does the target SillyTavern build accept and round-trip? | Golden JSON/PNG fixtures import, export, and read back without semantic drift |
 | S-03 Official source check | Can the exact official URLs be retrieved and reduced to stable evidence within the demo environment? | Allowlisted fetch produces a recorded pass and a controlled unavailable result |
-| S-04 Demo model | Does the selected Bedrock model meet English quality, tool reliability, latency, and acceptable demo cost? | Representative run completes within the PRD target and all validators pass |
+| S-04 Demo model | Does the selected B-AI model meet English quality, tool reliability, latency, and acceptable demo cost? | Representative run completes within the PRD target and all validators pass |
 
 ## 17. Approval Status
 
 The core boundary was confirmed under C-026: Strands controls creative reasoning and chooses tools, while the case controller and deterministic services control durable state and completion. The user jointly approved this complete architecture and the project plan under C-029 on September 5, 2026. This document is now the development architecture baseline and freezes the lifecycle model, common tool contract, canonical content models, dependency direction, and P0 platform boundary.
 
-No unresolved user-level architecture decision remains. Exact PNG compatibility, official-source extraction, Strands integration behavior, and final Bedrock model selection remain bounded development Spikes with explicit passing evidence. Ordinary findings inside this baseline are resolved by the project lead; a change to product scope, frozen architecture, recurring infrastructure, or material cost returns to the user.
+No unresolved user-level architecture decision remains. Exact PNG compatibility, official-source extraction, Strands integration behavior, and final B-AI model selection remain bounded development Spikes with explicit passing evidence. Ordinary findings inside this baseline are resolved by the project lead; a change to product scope, frozen architecture, recurring infrastructure, or material cost returns to the user.
 
 ## 18. Primary Technical Sources
 

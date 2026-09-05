@@ -6,8 +6,14 @@ architecture-version: 1
 owner: Aria Qiao
 product_baseline: Approved PRD C-025
 architecture_baseline: Approved TECHNICAL-ARCHITECTURE.md; C-026; C-029
-last_reviewed: 2026-09-05
+last_reviewed: 2026-09-06
+amended: 2026-09-06 — user decision C-2026-09-06 (B-AI development model provider)
 ---
+
+---
+
+> **Amendment — 2026-09-06 (user decision, product owner)**
+> Development model provider changed from Amazon Bedrock to **B-AI** (OpenAI-compatible, `https://api.b.ai/v1`), via the Strands OpenAI-compatible provider adapter. Authorized model list (use any actually available; auto-fallback, no new user confirmation): `hy3` (default start, not forced), `mimo-v2.5`, `glm-5.3-flash`, `qwen3.8-flash`. Dev credentials and full config: `project/Collaboration/b-ai-development-provider.env` (plaintext per user instruction; never committed to the product repository). The former `bedrock-credentials-missing` blocker is void; model selection is an authorized implementation decision. Where this document names "Bedrock"/"AWS" for the development model provider, the B-AI provider above is the effective configuration. Work packages, gates, scope, and product behavior otherwise unchanged.
 
 # Project Plan
 
@@ -23,7 +29,7 @@ This project is being built for **Agents for Humans**.
 
 ### P0 includes
 
-- a local Python application using the AWS Strands Agents SDK and Amazon Bedrock;
+- a local Python application using the AWS Strands Agents SDK with a B-AI (OpenAI-compatible) development model provider;
 - one Streamlit page for New Project, Resume Project, chat, uploads, real progress, blockers, and downloads;
 - one character card and one logical lorebook per case;
 - TXT and Markdown story input; character-card JSON/PNG and lorebook JSON input;
@@ -82,7 +88,7 @@ Development follows [TECHNICAL-ARCHITECTURE.md](TECHNICAL-ARCHITECTURE.md):
 
 - a local, single-process Python 3.12 application;
 - Windows as the primary implementation and acceptance environment, with portable Python paths and no untested cross-platform promise;
-- one Strands agent with Amazon Bedrock and project-owned tools;
+- one Strands agent with a B-AI (OpenAI-compatible) model provider and project-owned tools;
 - Streamlit as a thin interface;
 - a Case Controller that owns lifecycle and delivery gates;
 - local workspace files as the only recoverable case authority;
@@ -152,7 +158,7 @@ WP-03, WP-04, and WP-05 can proceed independently after the relevant Spike evide
 | Stage | Required result |
 | --- | --- |
 | Baseline | Runtime installs and starts in the Windows development environment |
-| Risk closure | Strands, Bedrock, ST formats, PNG transport, official-source checks, and the selected model have passing Spike evidence |
+| Risk closure | Strands, B-AI provider, ST formats, PNG transport, official-source checks, and the selected model have passing Spike evidence |
 | Domain core | Case state, safe workspaces, rule assets, canonical content, serializers, and validators pass their contracts |
 | Integration | The Strands agent, bounded tools, and Streamlit complete the main workflow |
 | Product acceptance | Recovery, modification, security, cleanup, and representative end-to-end scenarios pass |
@@ -189,12 +195,12 @@ If delivery is constrained, AgentCore and every P1 idea remain excluded. The com
 
 **Work:**
 
-- **S-01:** prove one Bedrock-backed Strands invocation can use project-owned custom tools, current structured output, lifecycle hooks, bounded model/tool turns, and a real timeout or cancellation path inside Streamlit;
+- **S-01:** prove one B-AI-backed Strands invocation can use project-owned custom tools, current structured output, lifecycle hooks, bounded model/tool turns, and a real timeout or cancellation path inside Streamlit;
 - **S-02:** inspect current SillyTavern behavior and freeze exact new/modified card, standalone/embedded lorebook, and PNG chunk profiles using golden fixtures;
 - **S-03:** prove allowlisted official sources can be retrieved, bounded, recorded, compared with the local profile, and reported unavailable without false success;
-- **S-04:** measure the candidate Bedrock model on the representative English case for creative quality, tool reliability, latency, and estimated demo cost;
+- **S-04:** measure the candidate B-AI model on the representative English case for creative quality, tool reliability, latency, and estimated demo cost;
 - record each result in the architecture's format resources or decision notes, replacing assumptions with exact implementation inputs;
-- verify the chosen Bedrock model and region are actually available in the development environment rather than relying on the SDK's current example default.
+- verify the chosen B-AI model is actually available in the development environment rather than relying on defaults.
 
 **Exit evidence:** Every architecture Spike has its stated passing evidence. A failed candidate produces a bounded replacement or an explicit blocker; it does not expand product scope.
 
@@ -269,7 +275,7 @@ If delivery is constrained, AgentCore and every P1 idea remain excluded. The com
 
 **Work:**
 
-- configure the Bedrock model through environment-backed application settings;
+- configure the model provider (B-AI) through environment-backed application settings;
 - assemble each fresh invocation from the current system prompt, reviewed rule assets, compact case context, and eight bounded tools;
 - implement Pydantic tool arguments, common result envelopes, stable failure codes, and application-injected invocation IDs, operation IDs, active-case identity, and revision checks;
 - implement `TurnOutcome` with question, delivered, and blocked results;
@@ -279,7 +285,7 @@ If delivery is constrained, AgentCore and every P1 idea remain excluded. The com
 - apply bounded provider, structured-output, and format-repair attempts;
 - ensure imported prompts cannot add tools, paths, URLs, permissions, or completion authority.
 
-**Exit evidence:** A fake-model integration suite proves the complete tool sequence, Q&A wait/resume, invalid outcome repair, format repair, blocked result, delivery gate, and cleanup. A Bedrock smoke case proves the same product contract with real tool events.
+**Exit evidence:** A fake-model integration suite proves the complete tool sequence, Q&A wait/resume, invalid outcome repair, format repair, blocked result, delivery gate, and cleanup. A B-AI smoke case proves the same product contract with real tool events.
 
 **Covers:** FR-003 through FR-010, BR-001 through BR-010, NFR-003, and NFR-005.
 
@@ -293,7 +299,7 @@ If delivery is constrained, AgentCore and every P1 idea remain excluded. The com
 - collect the local root, message, supported uploads, Resume, Abandon, and New Modification actions;
 - render the saved active question and prevent duplicate submission;
 - display sanitized real-time agent and tool events through a compact status area;
-- render clear supported-input, Bedrock-processing, waiting, blocked, and retry guidance in American English;
+- render clear supported-input, model-processing (B-AI), waiting, blocked, and retry guidance in American English;
 - list deliverables from verified export references and serve their exact bytes for download;
 - keep Streamlit session state limited to view convenience and selected case location;
 - make the representative flow clear without product-level frontend work.
@@ -343,7 +349,7 @@ If delivery is constrained, AgentCore and every P1 idea remain excluded. The com
 
 | Gate | Required evidence | Blocks |
 | --- | --- | --- |
-| G-01 Runtime | S-01 and S-04 pass with a real Bedrock model | Agent integration |
+| G-01 Runtime | S-01 and S-04 pass with a real B-AI model | Agent integration |
 | G-02 Format | S-02 freezes card, lorebook, and PNG profiles | Runtime format generation |
 | G-03 Source | S-03 proves pass and unavailable behavior | Delivery finalization |
 | G-04 Domain | State, workspace, canonical content, and codecs pass isolated tests | Full integration |
@@ -387,8 +393,8 @@ Tests should prove behavioral contracts and risky transformations. Low-impact di
 
 | Risk | Early signal | Required response |
 | --- | --- | --- |
-| Bedrock model access is unavailable | S-01 cannot invoke the configured model | Resolve AWS access or select another suitable Bedrock model; do not switch providers silently |
-| Model is creative but unreliable with tools | S-04 repeats, skips gates, or produces invalid outcomes | Improve contracts and prompt, then select a more reliable Bedrock model within the same architecture |
+| B-AI model access is unavailable | S-01 cannot invoke the configured model | Switch to the next authorized model in the list or report a bounded blocker; do not expand product scope silently |
+| Model is creative but unreliable with tools | S-04 repeats, skips gates, or produces invalid outcomes | Improve contracts and prompt, then select a more reliable B-AI model within the same architecture |
 | CCv3 and ST formats disagree | S-02 cannot round-trip a shared schema | Keep explicit serializer profiles and target the verified ST behavior; document the supported baseline |
 | PNG compatibility remains ambiguous | `chara`/`ccv3` fixtures disagree across readers | Choose the smallest verified chunk strategy and state its compatibility; block unsupported promises |
 | Official pages change or resist extraction | S-03 produces unstable or inconclusive evidence | Use exact source/commit URLs where possible and block finalization when current evidence is insufficient |
@@ -424,5 +430,5 @@ P1 cannot delay or redefine this completion condition.
 - Plan conclusion: approved for development. Approval date: September 5, 2026. Jointly approved architecture: version 1.
 - `project/Plan/` is the development baseline. After the required project initialization, Codex issues bounded work packages to Cursor in dependency order and keeps accepted decisions synchronized with these two files.
 - Cursor performs implementation and tests on Windows. Claude Code reviews each completed package independently. Codex resolves findings and accepts or returns the package.
-- Live Bedrock Spikes require working credentials and model access in the development environment; no credential value enters source, evidence, or review prompts.
+- Live model Spikes (B-AI) require working credentials and model access in the development environment; the development key stays in `project/Collaboration/b-ai-development-provider.env` (plaintext per user decision) and no credential value enters the product repository, source, evidence, or review prompts.
 - Product-scope changes, recurring infrastructure, a new state authority, or material cost require user approval and an updated baseline. Ordinary implementation findings are resolved by Codex and recorded in the relevant engineering artifact.

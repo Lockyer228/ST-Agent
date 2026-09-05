@@ -3,28 +3,48 @@
 Recorded 2026-09-06 on Windows from `impl/cursor`. Credentials, keys, and
 absolute machine paths are omitted.
 
-## S-01 Strands + Bedrock
+## Provider decision (2026-09-06)
 
-**Result: explicit blocker** `bedrock-credentials-missing`
+Development model provider is **B-AI** (OpenAI-compatible
+`https://api.b.ai/v1`) via the Strands `OpenAIModel` adapter. Authorized
+models, tried in order from the configured start: `hy3`, `mimo-v2.5`,
+`glm-5.3-flash`, `qwen3.8-flash`. The former `bedrock-credentials-missing`
+blocker is void. API key is read only from `ST_AGENT_API_KEY` (collaboration
+env file outside product Git).
 
-Evidence:
+## S-01 Strands + B-AI
 
-- `boto3.Session().get_credentials()` is `None` (no env keys, no `AWS_PROFILE`,
-  no `%USERPROFILE%\.aws`).
-- `run_strands_spike()` returns status `blocked` without calling Bedrock.
-- SDK path proven in code (not live): `Agent(..., structured_output_model=TurnOutcome)`,
-  project-owned `ping_runtime` tool, `BeforeToolCallEvent`/`AfterToolCallEvent`
-  hooks, `bound_turns_hook` calling `agent.cancel()`, invocation
-  `cancel_signal=threading.Event` documented on Strands 1.54 `Agent.__call__`.
-- Default SDK region if unset is `us-west-2` (`BedrockModel.DEFAULT_BEDROCK_REGION`).
-  No region is locked until credentials exist.
+**Result: pass** on `hy3` (no fallback).
 
-Bounded replacement: none. A fake model would not satisfy "Bedrock-backed".
-Do not expand into WP-06 agent product work.
+Live invocation (`uv run python`, `run_strands_spike()`):
+
+| Field | Value |
+| --- | --- |
+| status | `pass` |
+| model_id | `hy3` |
+| fallback_tried | `hy3` |
+| stop_reason | `tool_use` (Strands structured-output tool) |
+| events | `tool-start:ping_runtime,tool-end:ping_runtime,tool-start:TurnOutcome,tool-end:TurnOutcome` |
+| kind | `blocked` (as instructed; no delivery claimed) |
+| elapsed_s | 10.141 |
+| tokens | input 1031 / output 167 |
+| message | American English; reports `ok:st-agent:spike` |
+
+Cancel / timeout (same helper, no prompt bodies or keys logged):
+
+- `cancel_signal` already set: `stop_reason=cancelled`, elapsed 1.721s, no tool events.
+- `timeout_s=0.05` timer setting the same event: `stop_reason=cancelled`, elapsed 2.126s.
+
+Bounded turns: `limits.turns=4` plus `bound_turns_hook(max_tool_turns=2)`.
+Streamlit "Run S-01 spike" calls the same `run_strands_spike()`.
+
+Known provider quirk (did not fail the spike): Strands logs
+`reasoningContent is not supported in multi-turn conversations with the Chat
+Completions API` on the B-AI Chat Completions path.
 
 ## S-02 ST format and PNG
 
-**Result: pass** (source + fixture freeze; no local SillyTavern install)
+**Result: pass** (unchanged by the provider switch).
 
 Inspected:
 
@@ -49,7 +69,7 @@ runtime cases will not repeat ST import.
 
 ## S-03 Official sources
 
-**Result: pass** (unit pass + live fetch recorded below)
+**Result: pass** (unchanged by the provider switch).
 
 Allowlist in `source-manifest.json`. Timeouts, size cap, no off-allowlist
 redirects. 404 is `unavailable`, not pass.
@@ -64,11 +84,27 @@ Live Windows fetch (httpx, no secrets):
 
 ## S-04 Demo model
 
-**Result: explicit blocker** same credential gap as S-01.
+**Result: pass** on `hy3` (no fallback). Representative English case via
+`run_model_measurement()`.
 
-Candidate remains architecture starting point
-`global.anthropic.claude-sonnet-4-6`. Region not selected. Quality, latency,
-and demo cost were not measured.
+| Field | Value |
+| --- | --- |
+| model_id | `hy3` |
+| fallback_tried | `hy3` |
+| stop_reason | `tool_use` |
+| tool events | `ping_runtime` then `TurnOutcome` |
+| kind | `blocked` |
+| elapsed_s | 6.126 (within NFR-003 three-minute target) |
+| tokens | input 1103 / output 326 |
+| english | ASCII / American English tavern-keeper description on-prompt |
+
+Quality: two-sentence NPC sketch stayed on the rain-soaked port / missing-ships
+ledger brief; natural American English. Tool reliability: one `ping_runtime`
+call and a valid `TurnOutcome`. Latency is acceptable for the local demo.
+
+Estimated demo cost: B-AI public API docs (`docs.b.ai` LLM service API) do not
+publish a unit price. Token counts above are the measurable proxy; no key or
+account balance was logged.
 
 ## WP-01 review A/B/C
 

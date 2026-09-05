@@ -12,7 +12,7 @@ dependencies = [
     "httpx",
     "pillow",
     "pydantic",
-    "strands-agents",
+    "strands-agents[openai]",
     "streamlit",
 ]
 

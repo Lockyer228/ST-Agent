@@ -1,4 +1,4 @@
-"""S-01 wiring without claiming a live Bedrock pass."""
+"""S-01 wiring without claiming a live B-AI pass."""
 
 from __future__ import annotations
 
@@ -20,13 +20,32 @@ def test_ping_tool_is_project_owned() -> None:
     assert "st-agent" in result.lower() or "ok" in result.lower()
 
 
-def test_credential_probe_does_not_expose_secrets() -> None:
+def test_credential_probe_missing_key(monkeypatch) -> None:
+    monkeypatch.setattr("st_agent.spike.load_local_env", lambda: None)
+    monkeypatch.delenv("ST_AGENT_API_KEY", raising=False)
+    monkeypatch.delenv("ST_AGENT_MODEL_ID", raising=False)
+    monkeypatch.delenv("ST_AGENT_BASE_URL", raising=False)
+    monkeypatch.delenv("ST_AGENT_PROVIDER", raising=False)
+
     status = credential_probe()
-    text = str(status)
-    assert "AKIA" not in text
-    assert "secret" not in text.lower()
-    assert status.available is False or status.available is True
-    assert status.region_source in {"env", "session", "unset", "sdk-default"}
+    assert status.available is False
+    assert status.provider
+    assert status.model_id == "hy3"
+    assert "api_key" not in str(status).lower()
+
+
+def test_api_key_counts_as_credentials(monkeypatch) -> None:
+    monkeypatch.setattr("st_agent.spike.load_local_env", lambda: None)
+    monkeypatch.setenv("ST_AGENT_API_KEY", "fixture-key-not-a-secret")
+    monkeypatch.setenv("ST_AGENT_PROVIDER", "B-AI")
+    monkeypatch.setenv("ST_AGENT_BASE_URL", "https://api.b.ai/v1")
+    monkeypatch.setenv("ST_AGENT_MODEL_ID", "hy3")
+
+    status = credential_probe()
+    assert status.available is True
+    assert status.provider == "B-AI"
+    assert status.base_url == "https://api.b.ai/v1"
+    assert "fixture-key-not-a-secret" not in str(status)
 
 
 def test_bound_turns_hook_cancels_after_limit() -> None:

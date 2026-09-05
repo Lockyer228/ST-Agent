@@ -38,17 +38,18 @@ uv run python -c "import st_agent; print(st_agent.__version__)"
 
 ## Configuration
 
-Copy `.env.example` to `.env` if you want local defaults. `.env` is gitignored and must never contain credentials.
+Copy `.env.example` to `.env` for local defaults. `.env` is gitignored. Development credentials are loaded from `project/Collaboration/b-ai-development-provider.env` when that file is present (outside this Git tree).
 
 | Variable | Purpose |
 | --- | --- |
-| `AWS_REGION` or `AWS_DEFAULT_REGION` | AWS region for Amazon Bedrock. No default is locked in this baseline. |
-| `ST_AGENT_MODEL_ID` | Bedrock model ID. Default: `global.anthropic.claude-sonnet-4-6` (architecture starting point; later work may replace it after access, quality, latency, and cost checks). |
-| `AWS_PROFILE` | Optional named profile for the standard AWS credential chain. |
+| `ST_AGENT_PROVIDER` | Development model provider. Default: `B-AI`. |
+| `ST_AGENT_BASE_URL` | OpenAI-compatible API base URL. Default: `https://api.b.ai/v1`. |
+| `ST_AGENT_MODEL_ID` | Model ID. Default: `hy3`. Authorized list: `hy3`, `mimo-v2.5`, `glm-5.3-flash`, `qwen3.8-flash`. Runtime falls back along that list. |
+| `ST_AGENT_API_KEY` | B-AI API key. Local env only; never commit. |
 
-Credentials use the **standard AWS provider chain** (environment, shared credentials file, or other chain sources). Do not write access keys, session tokens, or profiles into this repository, case files, logs, or generated artifacts.
+Do not commit `.env`, API keys, or session tokens. Do not put secrets in case files, logs, or generated artifacts.
 
-User content that later work packages send to Bedrock is untrusted story material. The UI and this README will keep that dependency explicit.
+User content that later work packages send to B-AI is untrusted story material. The UI and this README will keep that dependency explicit.
 
 ## Run
 
@@ -56,7 +57,7 @@ User content that later work packages send to Bedrock is untrusted story materia
 uv run streamlit run app.py
 ```
 
-The shell starts a local Streamlit page. It shows the runtime version, configured region, and model ID. It does not create cases or write user files.
+The shell starts a local Streamlit page. It shows the runtime version, provider, base URL, and model ID. It does not create cases or write user files.
 
 ## Test
 
