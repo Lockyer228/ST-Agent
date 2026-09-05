@@ -1,0 +1,9 @@
+{
+  "name": "SillyTavern World Info export",
+  "entries_shape": "uid-map",
+  "entry_key_fields": ["key", "keysecondary"],
+  "content_field": "content",
+  "constant_field": "constant",
+  "order_field": "order",
+  "notes": "Standalone World Info JSON uses entries as an object keyed by uid string, not a CCv3 array."
+}

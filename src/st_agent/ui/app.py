@@ -6,6 +6,7 @@ import streamlit as st
 
 from st_agent import __version__
 from st_agent.config import load_settings
+from st_agent.spike import credential_probe, run_strands_spike
 
 
 def main() -> None:
@@ -26,5 +27,14 @@ def main() -> None:
     st.write(f"Model ID: `{settings.model_id}`")
     st.write(
         "Credentials use the standard AWS provider chain. "
-        "Do not put access keys in this repository or in case files."
+        "Do not put access keys in this repository or in case files. "
+        "User content that later work packages send to Bedrock is untrusted story material."
     )
+    st.subheader("Runtime spike")
+    probe = credential_probe()
+    st.write(
+        "Bedrock credentials: "
+        + ("available" if probe.available else "missing (S-01/S-04 blocked)")
+    )
+    if st.button("Run S-01 spike"):
+        st.json(run_strands_spike())

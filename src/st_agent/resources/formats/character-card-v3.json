@@ -1,0 +1,27 @@
+{
+  "spec": "chara_card_v3",
+  "spec_version": "3.0",
+  "required_data_fields": [
+    "name",
+    "description",
+    "personality",
+    "scenario",
+    "first_mes",
+    "mes_example",
+    "system_prompt",
+    "post_history_instructions",
+    "tags",
+    "creator",
+    "character_version",
+    "extensions",
+    "alternate_greetings",
+    "group_only_greetings",
+    "creator_notes"
+  ],
+  "png_chunks": {
+    "write": ["chara", "ccv3"],
+    "read_preference": ["ccv3", "chara"],
+    "encoding": "utf-8-then-base64-tEXt"
+  },
+  "source": "Character Card V3 SPEC + SillyTavern release src/character-card-parser.js"
+}

@@ -1,0 +1,26 @@
+{
+  "name": "Harbor Notes",
+  "description": "Embedded CCv3 character_book for the Mira Vale spike.",
+  "scan_depth": 4,
+  "token_budget": 512,
+  "recursive_scanning": false,
+  "extensions": {},
+  "entries": [
+    {
+      "id": 0,
+      "keys": ["harbor", "ferry"],
+      "content": "The last ferry leaves a wet rope of light across the water.",
+      "extensions": {},
+      "enabled": true,
+      "insertion_order": 100,
+      "case_sensitive": false,
+      "use_regex": false,
+      "constant": false,
+      "name": "Last ferry",
+      "comment": "Keyword lore",
+      "selective": false,
+      "secondary_keys": [],
+      "position": "after_char"
+    }
+  ]
+}

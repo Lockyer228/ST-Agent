@@ -1,0 +1,13 @@
+{
+  "name": "CCv3 character_book",
+  "entries_shape": "array",
+  "required_entry_fields": [
+    "keys",
+    "content",
+    "extensions",
+    "enabled",
+    "insertion_order",
+    "use_regex"
+  ],
+  "notes": "Embedded lorebook on a Character Card V3. entries is an array, not a uid map."
+}

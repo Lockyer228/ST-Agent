@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "max_bytes": 1000000,
+  "timeout_seconds": 10,
+  "sources": [
+    {
+      "id": "ccv3-spec",
+      "authority_class": "format-specification",
+      "url": "https://raw.githubusercontent.com/kwaroran/character-card-spec-v3/main/SPEC_V3.md",
+      "documented_url": "https://github.com/kwaroran/character-card-spec-v3/blob/main/SPEC_V3.md",
+      "local_profile": "character-card-v3",
+      "expected_markers": ["chara_card_v3", "ccv3"]
+    },
+    {
+      "id": "ccv3-spec-missing",
+      "authority_class": "format-specification",
+      "url": "https://raw.githubusercontent.com/kwaroran/character-card-spec-v3/main/DOES_NOT_EXIST.md",
+      "documented_url": "https://github.com/kwaroran/character-card-spec-v3/blob/main/SPEC_V3.md",
+      "local_profile": "character-card-v3",
+      "expected_markers": ["chara_card_v3"]
+    },
+    {
+      "id": "st-worldinfo",
+      "authority_class": "target-application",
+      "url": "https://docs.sillytavern.app/usage/core-concepts/worldinfo/",
+      "documented_url": "https://docs.sillytavern.app/usage/core-concepts/worldinfo/",
+      "local_profile": "st-lorebook",
+      "expected_markers": ["World Info", "lorebook"]
+    }
+  ]
+}
