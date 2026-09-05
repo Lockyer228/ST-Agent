@@ -24,7 +24,7 @@ uv sync --group dev
 
 This installs the locked runtime and development dependencies into `.venv`.
 
-Equivalent install of the locked package:
+Editable install (not lock-pinned; prefer `uv sync`):
 
 ```text
 uv pip install --python 3.12 -e .
@@ -69,7 +69,7 @@ Baseline smoke tests cover package import, environment settings without credenti
 ## Static check
 
 ```text
-uv run ruff check src tests
+uv run ruff check src tests app.py
 ```
 
 ## Data, paths, and cleanup
