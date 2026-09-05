@@ -14,8 +14,13 @@ build/
 dist/
 # Editor / OS
 .idea/
+.cursor/
 .DS_Store
 Thumbs.db
 # Local runtime state (do not commit)
+.env
 *.log
 .st-agent/
+.codegraph/
+# Shared control plane is a local symlink (Git sees it as a file on Windows)
+/project
