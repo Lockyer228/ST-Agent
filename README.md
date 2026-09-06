@@ -80,6 +80,7 @@ uv run ruff check src tests app.py
 - Later work packages must keep user originals, preserve unrelated unknown fields, and write uniquely named outputs.
 - Do not place a user workspace inside the application source tree.
 - Case folders use the approved English layout (`00-work/` through `04-exports/`). `case.json` is the recoverable state; `status.md` is generated from it.
+- Runtime English methods live in `src/st_agent/resources/methods/`. Canonical Markdown is the creative source; JSON is not.
 - Debug logs must not include prompt bodies, uploaded content, credentials, or hidden reasoning.
 
 ## Engineering baseline
@@ -95,6 +96,7 @@ Approved architecture and project plan (C-029) are copied into `docs/` so this r
 app.py                 Streamlit entry
 pyproject.toml         Python 3.12 project and exact tested lock (uv.lock)
 src/st_agent/          Importable runtime package
+src/st_agent/resources/methods/  English Q&A, creation, and ST mapping rules
 tests/                 Baseline smoke tests
 docs/                  Approved engineering baseline
 ```
