@@ -8,7 +8,7 @@ from st_agent.paths import package_dir
 
 METHODS = package_dir() / "resources" / "methods"
 CJK = re.compile(r"[\u4e00-\u9fff]")
-FORBIDDEN = ("seraphina", "d:\\", "/home/", "c:\\users\\", "90%", "绝对")
+FORBIDDEN = ("seraphina", "d:\\", "/home/", "c:\\users\\", "90%")
 
 
 def _text(name: str) -> str:

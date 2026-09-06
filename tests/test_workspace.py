@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -225,6 +226,21 @@ def test_close_removes_work_keeps_assets(tmp_path: Path) -> None:
     assert not (case_root / "00-work" / "intake.md").exists()
 
 
+def _link_directory(link: Path, target: Path) -> str:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+        return "symlink"
+    except OSError:
+        result = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            pytest.skip(result.stderr.strip() or result.stdout.strip() or "directory link failed")
+        return "junction"
+
+
 def test_close_unlinks_directory_symlink_without_removing_target(tmp_path: Path) -> None:
     case_root = create_case(tmp_path, "harbor-watch")
     target = tmp_path / "kept-outside"
@@ -232,10 +248,39 @@ def test_close_unlinks_directory_symlink_without_removing_target(tmp_path: Path)
     marker = target / "keep.txt"
     marker.write_text("safe", encoding="utf-8")
     link = case_root / "00-work" / "linked-dir"
-    try:
-        link.symlink_to(target, target_is_directory=True)
-    except OSError:
-        pytest.skip("symlink creation is not permitted")
+    _link_directory(link, target)
+    close_case(case_root)
+    assert not (case_root / "00-work").exists()
+    assert not link.exists()
+    assert marker.read_text(encoding="utf-8") == "safe"
+
+
+def test_close_unlinks_work_dir_link_without_removing_target(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    work = case_root / "00-work"
+    target = tmp_path / "outside-work"
+    work.rename(target)
+    _link_directory(work, target)
+    marker = target / "intake.md"
+    close_case(case_root)
+    assert not work.exists()
+    assert marker.read_text(encoding="utf-8") == ""
+
+
+def test_close_unlinks_nested_junction_without_removing_target(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    target = tmp_path / "kept-outside"
+    target.mkdir()
+    marker = target / "keep.txt"
+    marker.write_text("safe", encoding="utf-8")
+    link = case_root / "00-work" / "linked-dir"
+    result = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        pytest.skip(result.stderr.strip() or result.stdout.strip() or "mklink /J failed")
     close_case(case_root)
     assert not (case_root / "00-work").exists()
     assert not link.exists()

@@ -103,3 +103,84 @@ def test_parse_matches_render() -> None:
     assert parsed.character is not None
     assert parsed.character.name == "Mara"
     assert parsed.brief.delivery.character == "json"
+
+
+def _lorebook() -> LorebookContent:
+    return LorebookContent(
+        name="Harbor notes",
+        entries=[
+            LorebookEntry(
+                entry_id="harbor-ledger",
+                title="Harbor ledger",
+                content="A dog-eared book of ships that never returned.",
+                keys=["ledger", "ships"],
+                secondary_keys=["names"],
+                constant=False,
+                selective=True,
+                insertion_order=10,
+                position="after_char",
+                enabled=True,
+            )
+        ],
+    )
+
+
+def _replace_section(text: str, heading: str, body: str) -> str:
+    marker = heading + "\n"
+    start = text.index(marker) + len(marker)
+    rest = text[start:]
+    next_heading = rest.find("\n#")
+    if next_heading == -1:
+        return text[:start] + body + "\n"
+    return text[:start] + body + rest[next_heading:]
+
+
+def test_heading_in_field_text_is_an_error(tmp_path: Path) -> None:
+    text = _replace_section(
+        render_canonical(CanonicalDocument(brief=_brief(), character=_character())),
+        "## Description",
+        "Tavern keeper.\n## Trivia\nShe collects bottle caps.",
+    )
+    path = tmp_path / "heading-in-body.md"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(CanonicalError):
+        load_creative_path(path)
+
+
+def test_heading_in_entry_content_is_an_error() -> None:
+    text = _replace_section(
+        render_canonical(CanonicalDocument(brief=_brief(), lorebook=_lorebook())),
+        "### Content",
+        "A dog-eared book.\n### Subtitle\nSecond line.",
+    )
+    with pytest.raises(CanonicalError):
+        parse_canonical(text)
+
+
+def test_unknown_heading_is_an_error() -> None:
+    text = render_canonical(CanonicalDocument(brief=_brief(), character=_character()))
+    text = text.replace("# Character\n", "# Trivia\nNo.\n\n# Character\n")
+    with pytest.raises(CanonicalError):
+        parse_canonical(text)
+
+
+def test_comma_in_keys_is_an_error(tmp_path: Path) -> None:
+    text = _replace_section(
+        render_canonical(CanonicalDocument(brief=_brief(), lorebook=_lorebook())),
+        "### Keys",
+        "Dr. Smith, MD",
+    )
+    path = tmp_path / "comma-key.md"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(CanonicalError):
+        load_creative_path(path)
+
+
+def test_horizontal_rule_in_field_text_is_an_error() -> None:
+    text = _replace_section(
+        render_canonical(CanonicalDocument(brief=_brief(), character=_character())),
+        "## Description",
+        "Tavern keeper.\n---\nShe collects bottle caps.",
+    )
+    with pytest.raises(CanonicalError):
+        parse_canonical(text)

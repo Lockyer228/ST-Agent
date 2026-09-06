@@ -392,21 +392,28 @@ def resume_case(case_root: Path) -> ResumePlan:
     return ResumePlan(phase=manifest.phase, reason="unfinished")
 
 
+def _remove_work(work: Path) -> None:
+    if work.is_symlink() or work.is_junction():
+        work.unlink()
+        return
+    if not work.is_dir():
+        return
+    for child in list(work.iterdir()):
+        if child.is_symlink() or child.is_junction():
+            child.unlink()
+        elif child.is_file():
+            child.unlink()
+        elif child.is_dir():
+            _remove_work(child)
+    work.rmdir()
+
+
 def close_case(case_root: Path, *, state: str = "closed") -> None:
     story = case_root.name
     if (case_root / WORK_DIR / "case.json").is_file():
         story = load_manifest(case_root).story_name
     atomic_write(case_root / "README.md", _readme(story, state=state))
-    work = case_root / WORK_DIR
-    if work.is_dir():
-        for path in sorted(work.rglob("*"), reverse=True):
-            if path.is_symlink() or path.is_junction():
-                path.unlink()
-            elif path.is_file():
-                path.unlink()
-            elif path.is_dir():
-                path.rmdir()
-        work.rmdir()
+    _remove_work(case_root / WORK_DIR)
 
 
 def abandon_case(case_root: Path) -> None:

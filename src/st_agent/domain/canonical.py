@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -49,6 +50,15 @@ ENTRY_FIELDS = (
     ("Position", "position"),
     ("Enabled", "enabled"),
 )
+H1_ALLOWED = frozenset({"Brief", "Character", "Lorebook"})
+BRIEF_ALLOWED = frozenset(heading for heading, _ in BRIEF_FIELDS) | {"Delivery"}
+CHARACTER_ALLOWED = frozenset(heading for heading, _ in CHARACTER_FIELDS) | {
+    "Alternate Greetings",
+    "Tags",
+}
+LOREBOOK_ALLOWED = frozenset({"Name", "Entry"})
+ENTRY_ALLOWED = frozenset(heading for heading, _ in ENTRY_FIELDS)
+HEADING = re.compile(r"^(#{1,3}) (.+)$")
 
 
 class CanonicalError(ValueError):
@@ -61,40 +71,64 @@ class CanonicalDocument(BaseModel):
     lorebook: LorebookContent | None = None
 
 
-def _h_blocks(text: str, level: int) -> list[tuple[str, str]]:
+def _h_blocks(
+    text: str,
+    level: int,
+    allowed: frozenset[str],
+    nested: frozenset[int] = frozenset(),
+) -> list[tuple[str, str]]:
     blocks: list[tuple[str, str]] = []
     current: str | None = None
     buf: list[str] = []
     for line in text.splitlines():
-        hashes = len(line) - len(line.lstrip("#"))
-        if hashes == level and line.startswith("#" * level + " "):
-            if current is not None:
-                blocks.append((current, "\n".join(buf).strip()))
-            current = line[level + 1 :].strip()
-            buf = []
-        else:
-            buf.append(line)
+        match = HEADING.match(line)
+        if match:
+            hashes = len(match.group(1))
+            title = match.group(2).strip()
+            if hashes == level:
+                if title not in allowed:
+                    raise CanonicalError(f"unknown heading: {title}")
+                if current is not None:
+                    blocks.append((current, "\n".join(buf).strip()))
+                current = title
+                buf = []
+                continue
+            if hashes not in nested:
+                raise CanonicalError("heading markup is not allowed in field text")
+        buf.append(line)
     if current is not None:
         blocks.append((current, "\n".join(buf).strip()))
     return blocks
 
 
-def _h1(text: str) -> dict[str, str]:
-    return dict(_h_blocks(text, 1))
+def _reject_rule(heading: str, body: str) -> None:
+    if heading == "Alternate Greetings":
+        return
+    for line in body.splitlines():
+        if line.strip() == "---":
+            raise CanonicalError("horizontal rule is only allowed between alternate greetings")
 
 
-def _h2(text: str) -> dict[str, str]:
-    return dict(_h_blocks(text, 2))
-
-
-def _h3(text: str) -> dict[str, str]:
-    return dict(_h_blocks(text, 3))
+def _fields(
+    text: str,
+    level: int,
+    allowed: frozenset[str],
+    nested: frozenset[int] = frozenset(),
+) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for heading, body in _h_blocks(text, level, allowed, nested):
+        _reject_rule(heading, body)
+        out[heading] = body
+    return out
 
 
 def _list(value: str) -> list[str]:
     if not value.strip():
         return []
-    return [item.strip() for item in value.split(",") if item.strip()]
+    items = [line.strip() for line in value.splitlines() if line.strip()]
+    if any("," in item for item in items):
+        raise CanonicalError("list fields cannot contain commas")
+    return items
 
 
 def _bool(value: str) -> bool:
@@ -136,7 +170,7 @@ def render_canonical(doc: CanonicalDocument) -> str:
             parts.append(f"## {heading}\n{getattr(doc.character, field)}")
         greetings = "\n---\n".join(doc.character.alternate_greetings)
         parts.append(f"## Alternate Greetings\n{greetings}")
-        parts.append(f"## Tags\n{', '.join(doc.character.tags)}")
+        parts.append("## Tags\n" + "\n".join(doc.character.tags))
     if doc.lorebook is not None:
         parts.append("# Lorebook")
         parts.append(f"## Name\n{doc.lorebook.name}")
@@ -145,13 +179,13 @@ def render_canonical(doc: CanonicalDocument) -> str:
             for heading, field in ENTRY_FIELDS:
                 value = getattr(entry, field)
                 if isinstance(value, list):
-                    value = ", ".join(str(item) for item in value)
+                    value = "\n".join(str(item) for item in value)
                 parts.append(f"### {heading}\n{value}")
     return "\n\n".join(parts) + "\n"
 
 
 def _parse_brief(text: str) -> CaseBrief:
-    fields = _h2(text)
+    fields = _fields(text, 2, BRIEF_ALLOWED)
     values = {attr: fields.get(heading, "") for heading, attr in BRIEF_FIELDS}
     return CaseBrief(
         **values,
@@ -160,19 +194,18 @@ def _parse_brief(text: str) -> CaseBrief:
 
 
 def _parse_character(text: str) -> CharacterContent:
-    fields = _h2(text)
-    values = {attr: fields.get(heading, "") for heading, attr in CHARACTER_FIELDS}
+    fields = _fields(text, 2, CHARACTER_ALLOWED)
     greetings = fields.get("Alternate Greetings", "")
     alts = [item.strip() for item in greetings.split("\n---\n") if item.strip()]
     return CharacterContent(
-        **values,
+        **{attr: fields.get(heading, "") for heading, attr in CHARACTER_FIELDS},
         alternate_greetings=alts,
         tags=_list(fields.get("Tags", "")),
     )
 
 
 def _parse_entry(text: str) -> LorebookEntry:
-    fields = _h3(text)
+    fields = _fields(text, 3, ENTRY_ALLOWED)
     return LorebookEntry(
         entry_id=fields.get("Id", ""),
         title=fields.get("Title", ""),
@@ -190,7 +223,8 @@ def _parse_entry(text: str) -> LorebookEntry:
 def _parse_lorebook(text: str) -> LorebookContent:
     name = ""
     entries: list[LorebookEntry] = []
-    for heading, body in _h_blocks(text, 2):
+    for heading, body in _h_blocks(text, 2, LOREBOOK_ALLOWED, nested=frozenset({3})):
+        _reject_rule(heading, body)
         if heading == "Name":
             name = body
         elif heading == "Entry":
@@ -199,7 +233,7 @@ def _parse_lorebook(text: str) -> LorebookContent:
 
 
 def parse_canonical(text: str) -> CanonicalDocument:
-    blocks = _h1(text)
+    blocks = dict(_h_blocks(text, 1, H1_ALLOWED, nested=frozenset({2, 3})))
     if "Brief" not in blocks:
         raise CanonicalError("canonical Markdown requires a Brief section")
     return CanonicalDocument(
