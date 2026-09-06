@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -268,6 +269,8 @@ def test_close_unlinks_work_dir_link_without_removing_target(tmp_path: Path) -> 
 
 
 def test_close_unlinks_nested_junction_without_removing_target(tmp_path: Path) -> None:
+    if shutil.which("cmd") is None:
+        pytest.skip("cmd is not available")
     case_root = create_case(tmp_path, "harbor-watch")
     target = tmp_path / "kept-outside"
     target.mkdir()
