@@ -70,3 +70,31 @@ def test_save_user_inputs_maps_damaged_image(tmp_path: Path) -> None:
     assert not isinstance(err.value, UnidentifiedImageError)
     assert "UnidentifiedImageError" not in str(err.value)
     assert not any(path.is_file() for path in (case_root / "01-assets").rglob("*"))
+
+
+def test_truncated_json_is_english_rejection(tmp_path: Path) -> None:
+    damaged = tmp_path / "card.json"
+    damaged.write_text('{"spec": "chara_card_v3"', encoding="utf-8")
+    with pytest.raises(UnsupportedInput, match="JSON file is damaged") as err:
+        read_input(damaged)
+    assert err.value.__cause__ is None
+
+
+def test_png_card_with_garbage_payload_is_english_rejection(tmp_path: Path) -> None:
+    import base64
+    import io
+
+    from st_agent.png_card import PNG_SIG, _encode_chunk, _parse_chunks, _text_payload
+
+    raw = io.BytesIO()
+    Image.new("RGB", (4, 4), "navy").save(raw, format="PNG")
+    chunks = list(_parse_chunks(raw.getvalue()))
+    junk = base64.b64encode(b"not-json").decode("ascii")
+    iend = next(i for i, (ctype, _) in enumerate(chunks) if ctype == b"IEND")
+    chunks[iend:iend] = [(b"tEXt", _text_payload("ccv3", junk))]
+    png = PNG_SIG + b"".join(_encode_chunk(ctype, payload) for ctype, payload in chunks)
+    path = tmp_path / "card.png"
+    path.write_bytes(png)
+    with pytest.raises(UnsupportedInput, match="card payload") as err:
+        read_input(path)
+    assert err.value.__cause__ is None

@@ -39,9 +39,6 @@ MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_PIXELS = 16_000_000
 MAX_FILES = 10
 MAX_TOTAL_BYTES = 50 * 1024 * 1024
-TEXT_SUFFIXES = {".txt", ".md"}
-JSON_SUFFIXES = {".json"}
-IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 REJECTED_SUFFIXES = {
     ".gif",
     ".tiff",

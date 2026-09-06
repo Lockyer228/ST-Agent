@@ -98,7 +98,12 @@ class OfficialSourceService:
             self._client.close()
 
     def check(self, source_id: str) -> SourceCheck:
-        item = next(src for src in self._manifest["sources"] if src["id"] == source_id)
+        item = next(
+            (src for src in self._manifest["sources"] if src["id"] == source_id),
+            None,
+        )
+        if item is None:
+            raise ValueError(f"unknown source: {source_id}")
         url = item["url"]
         authority = item.get("authority_class", "")
 

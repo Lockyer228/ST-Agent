@@ -61,7 +61,10 @@ def sniff_bytes(data: bytes) -> InputKind:
         raise UnsupportedInput("the file type is not supported") from None
     stripped = text.lstrip()
     if stripped.startswith("{") or stripped.startswith("["):
-        json.loads(text)
+        try:
+            json.loads(text)
+        except ValueError:
+            raise UnsupportedInput("the JSON file is damaged and cannot be read") from None
         return InputKind.json
     return InputKind.text
 
@@ -78,6 +81,11 @@ def read_input(path: Path) -> tuple[InputKind, Any]:
     if kind is InputKind.text:
         return kind, data.decode("utf-8")
     if kind is InputKind.png_card:
-        return kind, PngCardCodec().read(data)
+        try:
+            return kind, PngCardCodec().read(data)
+        except ValueError:
+            raise UnsupportedInput(
+                "the PNG card payload is damaged and cannot be read"
+            ) from None
     open_image(data)
     return kind, data

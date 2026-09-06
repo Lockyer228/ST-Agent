@@ -29,6 +29,7 @@ from st_agent.services.validators import (
     promote_exports,
     validate_card,
     validate_lineage,
+    validate_lorebook,
     validate_png,
     validate_requested_output,
 )
@@ -163,3 +164,34 @@ def test_requested_output_and_lineage_validators() -> None:
     assert not result.ok
     lineage = {"character": Lineage(source_hash="aa", artifact_hash="bb", stale=True)}
     assert not validate_lineage(lineage).ok
+
+
+def test_png_semantic_rejects_description_mismatch() -> None:
+    card = serialize_character(_character())
+    png = PngCardCodec().write(Image.new("RGB", (6, 6), "navy"), card)
+    tampered = serialize_character(_character())
+    tampered["data"]["description"] = "tampered"
+    assert not validate_png(png, tampered).ok
+
+
+def test_lorebook_rejects_missing_required_fields() -> None:
+    book = serialize_embedded_lorebook(_book())
+    del book["entries"][0]["keys"]
+    assert not validate_lorebook(book, embedded=True).ok
+    standalone = serialize_standalone_lorebook(_book())
+    del standalone["entries"]["0"]["key"]
+    assert not validate_lorebook(standalone, embedded=False).ok
+
+
+def test_numeric_uid_collision_is_rejected() -> None:
+    book = LorebookContent(
+        name="Harbor Notes",
+        entries=[
+            LorebookEntry(entry_id="1", title="A", content="one", keys=["a"]),
+            LorebookEntry(entry_id="01", title="B", content="two", keys=["b"]),
+        ],
+    )
+    with pytest.raises(FormatError, match="uid"):
+        serialize_embedded_lorebook(book)
+    with pytest.raises(FormatError, match="uid"):
+        serialize_standalone_lorebook(book)

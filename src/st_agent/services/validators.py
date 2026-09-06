@@ -53,6 +53,16 @@ def validate_card(card: dict[str, Any]) -> ValidationResult:
 
 def validate_lorebook(book: dict[str, Any], *, embedded: bool) -> ValidationResult:
     issues: list[RepairableIssue] = []
+    profile = load_format_profile("st-character-book" if embedded else "st-lorebook")
+    if embedded:
+        required = list(profile["required_entry_fields"])
+    else:
+        required = [
+            *profile["entry_key_fields"],
+            profile["content_field"],
+            profile["constant_field"],
+            profile["order_field"],
+        ]
     entries = book.get("entries")
     if embedded:
         if not isinstance(entries, list):
@@ -66,6 +76,9 @@ def validate_lorebook(book: dict[str, Any], *, embedded: bool) -> ValidationResu
         if not isinstance(row, dict):
             issues.append(RepairableIssue("lorebook-entry", "entry is not an object"))
             continue
+        for name in required:
+            if name not in row:
+                issues.append(RepairableIssue("lorebook-field", f"missing {name}", name))
         position = row.get("position")
         if embedded and position not in SUPPORTED_POSITIONS:
             issues.append(RepairableIssue("lorebook-position", f"unsupported position: {position}"))
@@ -109,9 +122,7 @@ def validate_png(png: bytes, card: dict[str, Any]) -> ValidationResult:
         extracted = PngCardCodec().read(png)
     except ValueError as exc:
         return _result(RepairableIssue("png-read", str(exc)))
-    if extracted.get("data", {}).get("name") != card.get("data", {}).get("name"):
-        return _result(RepairableIssue("png-semantic", "PNG read-back does not match source"))
-    if extracted.get("data", {}).get("first_mes") != card.get("data", {}).get("first_mes"):
+    if extracted.get("data") != card.get("data"):
         return _result(RepairableIssue("png-semantic", "PNG read-back does not match source"))
     return _result()
 

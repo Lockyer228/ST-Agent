@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import httpx
+import pytest
 
 from st_agent.official_sources import OfficialSourceService, load_source_manifest
 
@@ -68,3 +69,10 @@ def test_empty_body_is_inconclusive() -> None:
     assert result.status == "inconclusive"
     assert result.retrieved_at
     assert result.authority_class == "format-specification"
+
+
+def test_unknown_source_id_is_value_error() -> None:
+    client = httpx.Client(transport=httpx.MockTransport(lambda _: None))
+    service = OfficialSourceService(client=client)
+    with pytest.raises(ValueError, match="unknown source"):
+        service.check("no-such-source")

@@ -21,18 +21,24 @@ def _position(entry: LorebookEntry) -> str:
     return entry.position
 
 
-def _uid(entry: LorebookEntry) -> int:
+def _uid(entry: LorebookEntry, seen: set[int]) -> int:
     if entry.entry_id.isdigit():
-        return int(entry.entry_id)
-    return zlib.crc32(entry.entry_id.encode("utf-8")) & 0x7FFFFFFF
+        uid = int(entry.entry_id)
+    else:
+        uid = zlib.crc32(entry.entry_id.encode("utf-8")) & 0x7FFFFFFF
+    if uid in seen:
+        raise FormatError(f"duplicate lorebook uid: {uid}")
+    seen.add(uid)
+    return uid
 
 
 def serialize_embedded_lorebook(book: LorebookContent) -> dict[str, Any]:
     entries = []
+    seen: set[int] = set()
     for entry in book.entries:
         position = _position(entry)
         item = {
-            "id": _uid(entry),
+            "id": _uid(entry, seen),
             "keys": list(entry.keys),
             "content": entry.content,
             "extensions": {},
@@ -63,9 +69,10 @@ def serialize_embedded_lorebook(book: LorebookContent) -> dict[str, Any]:
 
 def serialize_standalone_lorebook(book: LorebookContent) -> dict[str, Any]:
     entries: dict[str, Any] = {}
+    seen: set[int] = set()
     for entry in book.entries:
         position = _position(entry)
-        uid = _uid(entry)
+        uid = _uid(entry, seen)
         item = {
             "uid": uid,
             "key": list(entry.keys),
