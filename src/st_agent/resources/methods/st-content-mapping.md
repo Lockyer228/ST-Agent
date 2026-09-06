@@ -39,7 +39,14 @@ Entries are a dynamic dictionary. Content must be self-contained; titles and key
 - Organize by relevance and how often the fact is needed. Do not promise token percentages.
 - Hidden information stays out of constant context until the user asks.
 
-One canonical entry list feeds both standalone and embedded files. Serializers (later work) may use SillyTavern numeric positions or CCv3 string positions; canonical Markdown stores the spec strings `before_char` and `after_char`.
+One canonical entry list feeds both standalone and embedded files. Serializers
+map canonical `before_char` / `after_char` to SillyTavern numeric `0` / `1`.
+Any other position is rejected.
+
+Optional activation settings (probability, scan depth, recursion flags, and
+similar vendor fields) are **not** canonical Markdown. They live on the
+serializer/overlay: new cases omit them; modify cases keep unknown source
+fields through `SourceOverlay`.
 
 ## What not to bake in
 

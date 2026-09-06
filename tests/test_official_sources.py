@@ -51,3 +51,20 @@ def test_manifest_lists_both_authority_classes() -> None:
     classes = {item["authority_class"] for item in manifest["sources"]}
     assert "format-specification" in classes
     assert "target-application" in classes
+    from st_agent.official_sources import production_sources
+
+    ids = {item["id"] for item in production_sources(manifest)}
+    assert "ccv3-spec" in ids
+    assert "st-worldinfo" in ids
+    assert "ccv3-spec-missing" not in ids
+
+
+def test_empty_body_is_inconclusive() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="   ")
+
+    service = OfficialSourceService(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    result = service.check("ccv3-spec")
+    assert result.status == "inconclusive"
+    assert result.retrieved_at
+    assert result.authority_class == "format-specification"

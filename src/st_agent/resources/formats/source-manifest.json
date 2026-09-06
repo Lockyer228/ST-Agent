@@ -17,7 +17,8 @@
       "url": "https://raw.githubusercontent.com/kwaroran/character-card-spec-v3/main/DOES_NOT_EXIST.md",
       "documented_url": "https://github.com/kwaroran/character-card-spec-v3/blob/main/SPEC_V3.md",
       "local_profile": "character-card-v3",
-      "expected_markers": ["chara_card_v3"]
+      "expected_markers": ["chara_card_v3"],
+      "role": "unavailable-fixture"
     },
     {
       "id": "st-worldinfo",

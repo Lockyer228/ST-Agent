@@ -69,9 +69,9 @@ class SourceOverlay(BaseModel):
     merge_policy: str = "preserve_unknown"
 
     def merge(self, authored: dict[str, Any]) -> dict[str, Any]:
-        merged = dict(self.unknown_fields)
-        merged.update(authored)
-        return merged
+        from st_agent.formats import apply_card_modification
+
+        return apply_card_modification(self.unknown_fields, authored)
 
     def as_creative_text(self) -> str:
         return ""

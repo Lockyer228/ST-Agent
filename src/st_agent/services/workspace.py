@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 from st_agent.application.lifecycle import apply_input_change
 from st_agent.domain.case import CaseManifest, Condition, DeliveryPreference, Phase
@@ -261,16 +261,15 @@ def save_manifest(
 
 
 def _kind_for(path: Path) -> str:
+    from st_agent.services.readers import InputKind, sniff_path
+
     suffix = path.suffix.lower()
     if suffix in REJECTED_SUFFIXES:
         raise UnsupportedInput(f"unsupported file type: {suffix}")
-    if suffix in TEXT_SUFFIXES:
-        return "text"
-    if suffix in JSON_SUFFIXES:
-        return "json"
-    if suffix in IMAGE_SUFFIXES:
+    kind = sniff_path(path)
+    if kind in {InputKind.image, InputKind.png_card}:
         return "image"
-    raise UnsupportedInput(f"unsupported file type: {suffix or 'none'}")
+    return kind.value
 
 
 def _asset_dir(kind: str) -> str:
@@ -298,8 +297,15 @@ def _check_limits(path: Path, kind: str, *, existing_count: int, existing_bytes:
     if kind == "image":
         if size > MAX_IMAGE_BYTES:
             raise LimitExceeded(f"{path.name} exceeds the 20 MiB image limit")
-        with Image.open(path) as image:
-            width, height = image.size
+        try:
+            with Image.open(path) as image:
+                width, height = image.size
+        except UnidentifiedImageError:
+            raise UnsupportedInput(
+                "the file is not a readable PNG, JPEG, WebP, or BMP image"
+            ) from None
+        except OSError:
+            raise UnsupportedInput("the image file is damaged and cannot be read") from None
         if width * height > MAX_PIXELS:
             raise LimitExceeded(f"{path.name} exceeds the 16 megapixel limit")
 

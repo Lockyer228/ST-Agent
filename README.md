@@ -81,6 +81,7 @@ uv run ruff check src tests app.py
 - Do not place a user workspace inside the application source tree.
 - Case folders use the approved English layout (`00-work/` through `04-exports/`). `case.json` is the recoverable state; `status.md` is generated from it.
 - Runtime English methods live in `src/st_agent/resources/methods/`. Canonical Markdown is the creative source; JSON is not.
+- Format profiles, PNG chunk rules, and official-source allowlists live in `src/st_agent/resources/formats/`. Failed builds stay in `00-work/build/` until validators pass.
 - Debug logs must not include prompt bodies, uploaded content, credentials, or hidden reasoning.
 
 ## Engineering baseline
