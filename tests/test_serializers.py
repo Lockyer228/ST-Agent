@@ -105,12 +105,32 @@ def test_overlay_nested_overlap_keeps_unknown_subtree() -> None:
     assert card["data"]["name"] == "Mira Vale"
 
 
-def test_optional_activation_stays_off_canonical_and_on_extensions() -> None:
+def test_optional_activation_cannot_override_position() -> None:
     book = _book()
-    book.entries[0].optional_activation = {"probability": 40}
+    book.entries[0].optional_activation = {"probability": 40, "position": 999}
     embedded = serialize_embedded_lorebook(book)
-    assert embedded["entries"][0]["extensions"]["optional_activation"] == {"probability": 40}
-    assert "probability" not in book.entries[0].content
+    assert embedded["entries"][0]["position"] == "after_char"
+    assert "position" not in embedded["entries"][0]["extensions"]["optional_activation"]
+    standalone = serialize_standalone_lorebook(book)
+    assert standalone["entries"]["0"]["position"] == 1
+
+
+def test_overlay_extract_drops_character_book() -> None:
+    from st_agent.formats import extract_source_overlay
+
+    source = {
+        "spec": "chara_card_v3",
+        "spec_version": "3.0",
+        "data": {
+            "name": "Old",
+            "character_book": {"name": "Keep out", "entries": []},
+            "extensions": {"vendor_x": 1},
+        },
+    }
+    overlay = extract_source_overlay(source, source_hash="abc")
+    merged = overlay.merge(serialize_character(_character()))
+    assert "character_book" not in merged.get("data", {})
+    assert merged["data"]["extensions"]["vendor_x"] == 1
 
 
 def test_modify_preserves_unknown_top_level() -> None:

@@ -157,6 +157,17 @@ def test_heading_in_entry_content_is_an_error() -> None:
         parse_canonical(text)
 
 
+def test_escaped_heading_in_field_roundtrips() -> None:
+    character = _character()
+    character.description = "Tavern keeper.\n## Trivia\nShe collects bottle caps."
+    doc = CanonicalDocument(brief=_brief(), character=character)
+    text = render_canonical(doc)
+    assert "\\## Trivia" in text
+    restored = roundtrip(doc)
+    assert restored.character is not None
+    assert restored.character.description == character.description
+
+
 def test_unknown_heading_is_an_error() -> None:
     text = render_canonical(CanonicalDocument(brief=_brief(), character=_character()))
     text = text.replace("# Character\n", "# Trivia\nNo.\n\n# Character\n")

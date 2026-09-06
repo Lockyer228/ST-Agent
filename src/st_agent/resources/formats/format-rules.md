@@ -23,7 +23,14 @@ not repeat a SillyTavern import.
   map is `0` / `1`. Any other position is a repairable serializer error.
 - `optional_activation` is overlay/serializer-only. Canonical Markdown has no
   activation block. New cases leave it empty; modify flows keep vendor settings
-  in overlay unknown fields / entry `extensions`.
+  in overlay unknown fields / entry `extensions`. `position` is never taken
+  from `optional_activation`; canonical `before_char`/`after_char` remains the
+  only allowed value.
+- Modification overlay extraction copies unknown source fields but **drops**
+  `data.character_book`. Lorebook presence comes only from canonical entries.
+  Heading-style lines in canonical field text are escaped with a leading
+  backslash (`\## Title`) so round-trip stays lossless. Unescaped headings in
+  a loaded file remain a repairable error.
 
 ## PNG transport
 

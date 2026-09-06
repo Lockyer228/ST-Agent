@@ -19,6 +19,20 @@ def apply_card_modification(source: dict[str, Any], updates: dict[str, Any]) -> 
     return merged
 
 
+def extract_source_overlay(card: dict[str, Any], *, source_hash: str):
+    from st_agent.domain.content import SourceOverlay
+
+    unknown = copy.deepcopy(card)
+    data = unknown.get("data")
+    if isinstance(data, dict):
+        data.pop("character_book", None)
+    return SourceOverlay(
+        original_spec=str(card.get("spec") or "chara_card_v3"),
+        source_hash=source_hash,
+        unknown_fields=unknown,
+    )
+
+
 def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> None:
     for key, value in overlay.items():
         if key in base and isinstance(base[key], dict) and isinstance(value, dict):

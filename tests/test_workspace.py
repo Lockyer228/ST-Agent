@@ -207,6 +207,76 @@ def test_compact_context_reads_real_files(tmp_path: Path) -> None:
     assert isinstance(ctx["files"], list)
 
 
+def test_intake_qa_survives_new_uploads(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    atomic_write(case_root / "00-work" / "intake.md", "Q: Need a portrait?\nA: Later.\n")
+    original = tmp_path / "notes.txt"
+    original.write_text("keep me", encoding="utf-8")
+    save_user_inputs(case_root, [original])
+    intake = (case_root / "00-work" / "intake.md").read_text(encoding="utf-8")
+    assert "Need a portrait?" in intake
+    inputs = (case_root / "00-work" / "inputs.md").read_text(encoding="utf-8")
+    assert "notes.txt" in inputs
+
+
+def test_file_budget_uses_manifest_not_stray_disk_files(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    stray = case_root / "01-assets" / "orphan.txt"
+    stray.write_text("not in manifest", encoding="utf-8")
+    files = []
+    for i in range(10):
+        path = tmp_path / f"n{i}.txt"
+        path.write_text("ok", encoding="utf-8")
+        files.append(path)
+    save_user_inputs(case_root, files)
+    extra = tmp_path / "n10.txt"
+    extra.write_text("no", encoding="utf-8")
+    with pytest.raises(LimitExceeded):
+        save_user_inputs(case_root, [extra])
+
+
+def test_status_lists_manifest_files(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    original = tmp_path / "notes.txt"
+    original.write_text("keep me", encoding="utf-8")
+    save_user_inputs(case_root, [original])
+    status = (case_root / "00-work" / "status.md").read_text(encoding="utf-8")
+    assert "01-assets/notes.txt" in status
+
+
+def test_resume_uses_per_entry_source_path(tmp_path: Path) -> None:
+    from st_agent.services.workspace import file_sha256
+
+    case_root = create_case(tmp_path, "harbor-watch")
+    brief = case_root / "00-work" / "brief.md"
+    canonical = case_root / "03-final-text" / "canonical.md"
+    atomic_write(brief, "brief-v1")
+    atomic_write(canonical, "canon-v1")
+    manifest = load_manifest(case_root)
+    manifest.lineage["character"] = Lineage(
+        source_hash=file_sha256(canonical),
+        artifact_hash="out",
+        stale=False,
+        source_path="03-final-text/canonical.md",
+    )
+    save_manifest(case_root, manifest)
+    atomic_write(brief, "brief-v2")
+    plan = resume_case(case_root)
+    loaded = load_manifest(case_root)
+    assert loaded.lineage["character"].stale is False
+    assert plan.phase != Phase.intake
+    atomic_write(canonical, "canon-v2")
+    plan = resume_case(case_root)
+    loaded = load_manifest(case_root)
+    assert loaded.lineage["character"].stale is True
+    assert plan.phase == Phase.intake
+
+
+def test_workspace_does_not_import_application() -> None:
+    source = Path("src/st_agent/services/workspace.py").read_text(encoding="utf-8")
+    assert "st_agent.application" not in source
+
+
 def test_close_removes_work_keeps_assets(tmp_path: Path) -> None:
     case_root = create_case(tmp_path, "harbor-watch")
     original = tmp_path / "notes.txt"

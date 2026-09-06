@@ -21,6 +21,10 @@ def _position(entry: LorebookEntry) -> str:
     return entry.position
 
 
+def _activation(entry: LorebookEntry) -> dict[str, Any]:
+    return {key: value for key, value in entry.optional_activation.items() if key != "position"}
+
+
 def _uid(entry: LorebookEntry, seen: set[int]) -> int:
     if entry.entry_id.isdigit():
         uid = int(entry.entry_id)
@@ -54,7 +58,9 @@ def serialize_embedded_lorebook(book: LorebookContent) -> dict[str, Any]:
             "position": position,
         }
         if entry.optional_activation:
-            item["extensions"]["optional_activation"] = dict(entry.optional_activation)
+            activation = _activation(entry)
+            if activation:
+                item["extensions"]["optional_activation"] = activation
         entries.append(item)
     return {
         "name": book.name,
@@ -108,7 +114,7 @@ def serialize_standalone_lorebook(book: LorebookContent) -> dict[str, Any]:
             "displayIndex": uid,
         }
         if entry.optional_activation:
-            item.update(entry.optional_activation)
+            item.update(_activation(entry))
         entries[str(uid)] = item
     return {"entries": entries}
 

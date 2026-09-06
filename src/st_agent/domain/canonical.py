@@ -118,7 +118,7 @@ def _fields(
     out: dict[str, str] = {}
     for heading, body in _h_blocks(text, level, allowed, nested):
         _reject_rule(heading, body)
-        out[heading] = body
+        out[heading] = _unescape_field(body)
     return out
 
 
@@ -159,27 +159,42 @@ def _parse_delivery(text: str) -> DeliveryPreferences:
     )
 
 
+def _unescape_field(value: str) -> str:
+    return "\n".join(
+        line[1:] if line.startswith("\\") and HEADING.match(line[1:]) else line
+        for line in value.splitlines()
+    )
+
+
+def _escape_field(value: str) -> str:
+    return "\n".join("\\" + line if HEADING.match(line) else line for line in value.splitlines())
+
+
 def render_canonical(doc: CanonicalDocument) -> str:
     parts = ["# Brief"]
     for heading, field in BRIEF_FIELDS:
-        parts.append(f"## {heading}\n{getattr(doc.brief, field)}")
+        parts.append(f"## {heading}\n{_escape_field(getattr(doc.brief, field))}")
     parts.append(f"## Delivery\n{_delivery_text(doc.brief.delivery)}")
     if doc.character is not None:
         parts.append("# Character")
         for heading, field in CHARACTER_FIELDS:
-            parts.append(f"## {heading}\n{getattr(doc.character, field)}")
-        greetings = "\n---\n".join(doc.character.alternate_greetings)
+            parts.append(f"## {heading}\n{_escape_field(getattr(doc.character, field))}")
+        greetings = "\n---\n".join(
+            _escape_field(item) for item in doc.character.alternate_greetings
+        )
         parts.append(f"## Alternate Greetings\n{greetings}")
-        parts.append("## Tags\n" + "\n".join(doc.character.tags))
+        parts.append("## Tags\n" + "\n".join(_escape_field(tag) for tag in doc.character.tags))
     if doc.lorebook is not None:
         parts.append("# Lorebook")
-        parts.append(f"## Name\n{doc.lorebook.name}")
+        parts.append(f"## Name\n{_escape_field(doc.lorebook.name)}")
         for entry in doc.lorebook.entries:
             parts.append("## Entry")
             for heading, field in ENTRY_FIELDS:
                 value = getattr(entry, field)
                 if isinstance(value, list):
-                    value = "\n".join(str(item) for item in value)
+                    value = "\n".join(_escape_field(str(item)) for item in value)
+                else:
+                    value = _escape_field(str(value))
                 parts.append(f"### {heading}\n{value}")
     return "\n\n".join(parts) + "\n"
 
@@ -226,7 +241,7 @@ def _parse_lorebook(text: str) -> LorebookContent:
     for heading, body in _h_blocks(text, 2, LOREBOOK_ALLOWED, nested=frozenset({3})):
         _reject_rule(heading, body)
         if heading == "Name":
-            name = body
+            name = _unescape_field(body)
         elif heading == "Entry":
             entries.append(_parse_entry(body))
     return LorebookContent(name=name, entries=entries)

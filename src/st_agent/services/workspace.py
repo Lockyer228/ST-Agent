@@ -13,8 +13,13 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
-from st_agent.application.lifecycle import apply_input_change
-from st_agent.domain.case import CaseManifest, Condition, DeliveryPreference, Phase
+from st_agent.domain.case import (
+    CaseManifest,
+    Condition,
+    DeliveryPreference,
+    Phase,
+    apply_input_change,
+)
 from st_agent.paths import source_root as package_source_root
 
 WORK_DIR = "00-work"
@@ -169,6 +174,7 @@ def case_lock(case_root: Path):
 def _status_md(manifest: CaseManifest) -> str:
     blocker = manifest.blocker.message if manifest.blocker else "none"
     question = manifest.pending_question or "none"
+    files = "\n".join(f"  - {item.relative_path}" for item in manifest.inputs) or "  - none"
     return (
         f"# Case status\n\n"
         f"- Story: {manifest.story_name}\n"
@@ -178,6 +184,7 @@ def _status_md(manifest: CaseManifest) -> str:
         f"- Blocker: {blocker}\n"
         f"- Unresolved: {question}\n"
         f"- Next step: resume {manifest.phase}\n"
+        f"- Files:\n{files}\n"
     )
 
 
@@ -275,12 +282,13 @@ def _asset_dir(kind: str) -> str:
     return ASSETS_DIR
 
 
-def _count_inputs(case_root: Path) -> tuple[int, int]:
-    assets = case_root / ASSETS_DIR
-    if not assets.is_dir():
-        return 0, 0
-    files = [path for path in assets.rglob("*") if path.is_file()]
-    return len(files), sum(path.stat().st_size for path in files)
+def _manifest_totals(case_root: Path, refs: Sequence) -> tuple[int, int]:
+    total = 0
+    for item in refs:
+        path = case_root / item.relative_path
+        if path.is_file():
+            total += path.stat().st_size
+    return len(refs), total
 
 
 def _check_limits(path: Path, kind: str, *, existing_count: int, existing_bytes: int) -> None:
@@ -311,8 +319,8 @@ def save_user_inputs(case_root: Path, sources: Sequence[Path]) -> list:
     from st_agent.domain.case import ArtifactRef
 
     manifest = load_manifest(case_root)
-    count, total = _count_inputs(case_root)
     refs = list(manifest.inputs)
+    count, total = _manifest_totals(case_root, refs)
     for source in sources:
         origin = source.resolve()
         kind = _kind_for(origin)
@@ -336,12 +344,18 @@ def save_user_inputs(case_root: Path, sources: Sequence[Path]) -> list:
                 kind=kind,
             )
         )
-    intake = contained_path(case_root, WORK_DIR, "intake.md")
     names = "\n".join(f"- {item.relative_path}" for item in refs)
-    atomic_write(intake, f"Accepted inputs:\n{names}\n")
+    atomic_write(contained_path(case_root, WORK_DIR, "inputs.md"), f"Accepted inputs:\n{names}\n")
     manifest.inputs = refs
     save_manifest(case_root, apply_input_change(manifest) if refs else manifest)
     return refs
+
+
+def append_intake(case_root: Path, text: str) -> None:
+    path = contained_path(case_root, WORK_DIR, "intake.md")
+    current = path.read_text(encoding="utf-8") if path.is_file() else ""
+    addition = text if text.endswith("\n") else f"{text}\n"
+    atomic_write(path, current + addition)
 
 
 def compact_context(case_root: Path, max_chars: int = 800) -> dict[str, object]:
@@ -377,12 +391,12 @@ def resume_case(case_root: Path) -> ResumePlan:
     if manifest.condition == Condition.cleanup_pending:
         close_case(case_root)
         return ResumePlan(phase=Phase.cleanup, reason="cleanup_only")
-    brief = case_root / WORK_DIR / "brief.md"
-    if brief.is_file() and manifest.lineage:
-        digest = file_sha256(brief)
+    if manifest.lineage:
         stale = False
         lineage = {}
         for key, item in manifest.lineage.items():
+            source = case_root / item.source_path
+            digest = file_sha256(source) if source.is_file() else ""
             if item.source_hash != digest:
                 lineage[key] = item.model_copy(update={"stale": True})
                 stale = True

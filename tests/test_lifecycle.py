@@ -7,12 +7,18 @@ import pytest
 from st_agent.application.lifecycle import (
     InvalidTransition,
     advance_phase,
-    apply_input_change,
     clear_wait,
     mark_blocked,
     mark_cleanup_pending,
+    mark_waiting,
 )
-from st_agent.domain.case import CaseManifest, Condition, DeliveryPreference, Phase
+from st_agent.domain.case import (
+    CaseManifest,
+    Condition,
+    DeliveryPreference,
+    Phase,
+    apply_input_change,
+)
 
 
 def _manifest(phase: Phase = Phase.setup, condition: Condition = Condition.active) -> CaseManifest:
@@ -50,6 +56,13 @@ def test_block_stays_on_same_phase() -> None:
     assert blocked.condition == Condition.blocked
     assert blocked.blocker is not None
     assert blocked.blocker.code == "provider"
+
+
+def test_mark_waiting_records_the_question() -> None:
+    waiting = mark_waiting(_manifest(Phase.draft), "Please upload a portrait.")
+    assert waiting.condition == Condition.waiting_for_user
+    assert waiting.pending_question == "Please upload a portrait."
+    assert waiting.phase == Phase.draft
 
 
 def test_user_answer_clears_waiting() -> None:

@@ -57,6 +57,7 @@ class Lineage(BaseModel):
     source_hash: str
     artifact_hash: str | None = None
     stale: bool = False
+    source_path: str = "00-work/brief.md"
 
 
 class Blocker(BaseModel):
@@ -86,3 +87,12 @@ class CaseManifest(BaseModel):
     pending_question: str | None = None
     retry_count: int = 0
     last_error: str | None = None
+
+
+def apply_input_change(manifest: CaseManifest) -> CaseManifest:
+    lineage = {
+        key: item.model_copy(update={"stale": True}) for key, item in manifest.lineage.items()
+    }
+    return manifest.model_copy(
+        update={"phase": Phase.intake, "condition": Condition.active, "lineage": lineage}
+    )

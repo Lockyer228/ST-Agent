@@ -74,11 +74,13 @@ def clear_wait(manifest: CaseManifest) -> CaseManifest:
     )
 
 
-def apply_input_change(manifest: CaseManifest) -> CaseManifest:
-    lineage = {
-        key: item.model_copy(update={"stale": True}) for key, item in manifest.lineage.items()
-    }
-    return _replace(manifest, phase=Phase.intake, condition=Condition.active, lineage=lineage)
+def mark_waiting(manifest: CaseManifest, question: str) -> CaseManifest:
+    return _replace(
+        manifest,
+        condition=Condition.waiting_for_user,
+        pending_question=question,
+        blocker=None,
+    )
 
 
 def mark_cleanup_pending(manifest: CaseManifest) -> CaseManifest:
