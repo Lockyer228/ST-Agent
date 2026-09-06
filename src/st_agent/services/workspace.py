@@ -400,7 +400,9 @@ def close_case(case_root: Path, *, state: str = "closed") -> None:
     work = case_root / WORK_DIR
     if work.is_dir():
         for path in sorted(work.rglob("*"), reverse=True):
-            if path.is_file():
+            if path.is_symlink() or path.is_junction():
+                path.unlink()
+            elif path.is_file():
                 path.unlink()
             elif path.is_dir():
                 path.rmdir()

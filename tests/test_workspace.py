@@ -223,3 +223,21 @@ def test_close_removes_work_keeps_assets(tmp_path: Path) -> None:
     with pytest.raises(ClosedCaseError):
         resume_case(case_root)
     assert not (case_root / "00-work" / "intake.md").exists()
+
+
+def test_close_unlinks_directory_symlink_without_removing_target(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    target = tmp_path / "kept-outside"
+    target.mkdir()
+    marker = target / "keep.txt"
+    marker.write_text("safe", encoding="utf-8")
+    link = case_root / "00-work" / "linked-dir"
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlink creation is not permitted")
+    close_case(case_root)
+    assert not (case_root / "00-work").exists()
+    assert not link.exists()
+    assert marker.read_text(encoding="utf-8") == "safe"
+
