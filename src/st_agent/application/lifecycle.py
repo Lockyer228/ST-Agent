@@ -52,6 +52,25 @@ def advance_phase(manifest: CaseManifest, target: Phase) -> CaseManifest:
     return _replace(manifest, phase=target, condition=Condition.active, blocker=None)
 
 
+REWINDABLE = {
+    Phase.draft,
+    Phase.final_text,
+    Phase.build,
+    Phase.official_check,
+    Phase.validate,
+}
+
+
+def rewind_phase(manifest: CaseManifest, target: Phase) -> CaseManifest:
+    if target == manifest.phase:
+        return manifest
+    if manifest.phase not in REWINDABLE or target not in REWINDABLE:
+        raise InvalidTransition(f"{manifest.phase} -> {target}")
+    if PHASE_ORDER.index(target) > PHASE_ORDER.index(manifest.phase):
+        raise InvalidTransition(f"{manifest.phase} -> {target}")
+    return _replace(manifest, phase=target, condition=Condition.active, blocker=None)
+
+
 def mark_blocked(manifest: CaseManifest, *, code: str, message: str) -> CaseManifest:
     from st_agent.domain.case import Blocker
 

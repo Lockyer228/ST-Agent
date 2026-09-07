@@ -133,6 +133,7 @@ def test_fake_model_completes_json_delivery(tmp_path: Path) -> None:
     assert not (case_root / "00-work").exists()
     readme = (case_root / "README.md").read_text(encoding="utf-8")
     assert "closed" in readme.lower()
+    assert "04-exports/character-cards/card.json" in readme
 
 
 def test_duplicate_operation_is_idempotent(tmp_path: Path) -> None:

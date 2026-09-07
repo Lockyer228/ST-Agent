@@ -23,9 +23,12 @@ from st_agent.domain.case import Condition
 from st_agent.official_sources import OfficialSourceService
 from st_agent.outcomes import TurnOutcome
 from st_agent.services.workspace import (
+    CaseLocked,
     ClosedCaseError,
     append_intake,
+    atomic_write,
     canonicalize_root,
+    case_lock,
     load_manifest,
     save_manifest,
     save_user_inputs,
@@ -46,16 +49,19 @@ def _load_cached(case_root: Path, operation_id: str) -> TurnOutcome | None:
     path = _operation_path(case_root)
     if not path.is_file():
         return None
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if data.get("operation_id") != operation_id:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data.get("operation_id") != operation_id:
+            return None
+        return TurnOutcome.model_validate(data["outcome"])
+    except (OSError, ValueError, ValidationError, TypeError, KeyError):
         return None
-    return TurnOutcome.model_validate(data["outcome"])
 
 
 def _store_cached(case_root: Path, operation_id: str, outcome: TurnOutcome) -> None:
-    _operation_path(case_root).write_text(
+    atomic_write(
+        _operation_path(case_root),
         json.dumps({"operation_id": operation_id, "outcome": outcome.model_dump()}, indent=2),
-        encoding="utf-8",
     )
 
 
@@ -77,13 +83,37 @@ def submit_turn(
     source_service: OfficialSourceService | None = None,
 ) -> tuple[TurnOutcome, list[str]]:
     case_root = canonicalize_root(case_root)
+    try:
+        with case_lock(case_root):
+            return _submit_locked(
+                case_root,
+                message,
+                uploads=uploads,
+                operation_id=operation_id,
+                expected_revision=expected_revision,
+                model=model,
+                source_service=source_service,
+            )
+    except CaseLocked:
+        return (
+            TurnOutcome(kind="blocked", message="The case is locked.", blocker="case-locked"),
+            [],
+        )
+
+
+def _submit_locked(
+    case_root: Path,
+    message: str,
+    *,
+    uploads: Sequence[Path],
+    operation_id: str,
+    expected_revision: int | None,
+    model: Model | None,
+    source_service: OfficialSourceService | None,
+) -> tuple[TurnOutcome, list[str]]:
     cached = _load_cached(case_root, operation_id)
     if cached is not None:
         return cached, ["idempotent"]
-
-    if uploads:
-        save_user_inputs(case_root, uploads)
-    append_intake(case_root, f"User: {message}")
 
     try:
         manifest = load_manifest(case_root)
@@ -100,6 +130,10 @@ def submit_turn(
         )
         return outcome, []
 
+    if uploads:
+        save_user_inputs(case_root, uploads)
+    append_intake(case_root, f"User: {message}")
+
     if manifest.condition == Condition.waiting_for_user:
         save_manifest(case_root, clear_wait(manifest))
         manifest = load_manifest(case_root)
@@ -114,7 +148,13 @@ def submit_turn(
     system_prompt, user_prompt = assemble_prompt(case_root, message)
     tools = bind_tools(ctx)
 
-    def _invoke(active_model: Model, prompt: str, *, timeout_s: float | None = None) -> TurnOutcome:
+    def _invoke(
+        active_model: Model,
+        prompt: str,
+        *,
+        timeout_s: float | None = None,
+        turn_limit: int = MAX_TURNS,
+    ) -> TurnOutcome:
         signal = threading.Event()
         timer: threading.Timer | None = None
         if timeout_s and timeout_s > 0:
@@ -133,7 +173,7 @@ def submit_turn(
             result = agent(
                 prompt,
                 structured_output_model=TurnOutcome,
-                limits={"turns": MAX_TURNS},
+                limits={"turns": turn_limit},
                 cancel_signal=signal,
             )
         finally:
@@ -156,47 +196,48 @@ def submit_turn(
                 message="No ST_AGENT_API_KEY in this environment.",
                 blocker="b-ai-credentials-missing",
             )
-            _store_cached(case_root, operation_id, outcome)
-            return outcome, hooks.events
-        last_error = "unavailable"
-        outcome = None
-        deadline = time.perf_counter() + LIVE_TIMEOUT_S
-        for model_id in authorized_model_chain(settings.model_id):
-            remaining = deadline - time.perf_counter()
-            if remaining <= 1:
-                last_error = "timeout"
-                break
-            try:
-                outcome = _invoke(
-                    _live_model(model_id, base_url=settings.base_url, key=key),
-                    user_prompt,
-                    timeout_s=remaining,
+        else:
+            last_error = "unavailable"
+            outcome = None
+            deadline = time.perf_counter() + LIVE_TIMEOUT_S
+            for model_id in authorized_model_chain(settings.model_id):
+                remaining = deadline - time.perf_counter()
+                if remaining <= 1:
+                    last_error = "timeout"
+                    break
+                try:
+                    outcome = _invoke(
+                        _live_model(model_id, base_url=settings.base_url, key=key),
+                        user_prompt,
+                        timeout_s=remaining,
+                    )
+                    last_error = ""
+                    break
+                except Exception as exc:
+                    last_error = type(exc).__name__
+                    continue
+            if outcome is None:
+                outcome = TurnOutcome(
+                    kind="blocked",
+                    message=last_error,
+                    blocker="b-ai-models-unavailable",
                 )
-                last_error = ""
-                break
-            except Exception as exc:
-                last_error = type(exc).__name__
-                continue
-        if outcome is None:
-            outcome = TurnOutcome(
-                kind="blocked",
-                message=last_error,
-                blocker="b-ai-models-unavailable",
-            )
-            _store_cached(case_root, operation_id, outcome)
-            return outcome, hooks.events
     else:
         prompt = user_prompt
         last_exc: Exception | None = None
         outcome = None
         for attempt in range(PROVIDER_RETRIES + 1 + OUTCOME_REPAIRS):
+            budget = MAX_TURNS if attempt == 0 else 2
             try:
-                outcome = _invoke(model, prompt)
+                outcome = _invoke(model, prompt, turn_limit=budget)
                 last_exc = None
                 break
             except (ValidationError, ValueError, TypeError) as exc:
                 last_exc = exc
-                prompt = f"Previous outcome was invalid: {exc}. Return a valid TurnOutcome."
+                prompt = (
+                    f"{user_prompt}\n\nPrevious outcome was invalid: {exc}. "
+                    "Return a valid TurnOutcome."
+                )
             except Exception as exc:
                 last_exc = exc
                 if attempt >= PROVIDER_RETRIES:

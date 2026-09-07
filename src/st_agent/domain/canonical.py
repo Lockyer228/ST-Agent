@@ -151,12 +151,24 @@ def _parse_delivery(text: str) -> DeliveryPreferences:
             continue
         key, _, value = line.partition(":")
         data[key.strip().lower()] = value.strip()
+    if _portrait_escapes(data["portrait"]):
+        raise CanonicalError("portrait path must stay inside the case")
     return DeliveryPreferences(
         character=CardDelivery(data["character"] or "json"),
         lorebook=LorebookDelivery(data["lorebook"] or "none"),
         portrait_ref=data["portrait"] or None,
         environment_constraints=data["environment"] or None,
     )
+
+
+def _portrait_escapes(ref: str) -> bool:
+    if not ref:
+        return False
+    path = Path(ref)
+    posix = path.as_posix()
+    if path.is_absolute() or posix.startswith("/") or posix.startswith("~"):
+        return True
+    return ".." in path.parts
 
 
 def _unescape_field(value: str) -> str:

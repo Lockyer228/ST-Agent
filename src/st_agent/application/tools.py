@@ -11,7 +11,7 @@ from PIL import Image
 from strands import tool
 
 from st_agent.application.envelope import envelope
-from st_agent.application.lifecycle import InvalidTransition, advance_phase
+from st_agent.application.lifecycle import InvalidTransition, advance_phase, rewind_phase
 from st_agent.domain.canonical import (
     CanonicalDocument,
     CanonicalError,
@@ -26,6 +26,7 @@ from st_agent.domain.case import (
     Lineage,
     LorebookDelivery,
     Phase,
+    apply_input_change,
 )
 from st_agent.domain.content import CaseBrief, DeliveryPreferences
 from st_agent.formats import extract_source_overlay
@@ -53,6 +54,7 @@ from st_agent.services.validators import (
 from st_agent.services.workspace import (
     FINAL_DIR,
     WORK_DIR,
+    PathRejected,
     atomic_write,
     close_case,
     contained_path,
@@ -84,13 +86,41 @@ class ToolContext:
     format_repairs: int = 0
     finish_ok: bool = False
     source_service: OfficialSourceService | None = None
+    seq: int = 0
+
+    def next_op(self, tool: str) -> str:
+        self.seq += 1
+        return f"{self.invocation_id}:{tool}:{self.seq}"
+
+
+BRIEF_PHASES = {Phase.setup, Phase.intake, Phase.qa, Phase.draft}
+CANONICAL_PHASES = {
+    Phase.draft,
+    Phase.final_text,
+    Phase.build,
+    Phase.official_check,
+    Phase.validate,
+}
+BUILD_PHASES = {Phase.final_text, Phase.build, Phase.official_check, Phase.validate}
+SOURCE_PHASES = {Phase.build, Phase.official_check}
+VALIDATE_PHASES = {Phase.official_check, Phase.validate}
 
 
 def _too_long(value: str, limit: int = MAX_FIELD) -> bool:
     return len(value) > limit
 
 
-def _advance(case_root: Path, *targets: Phase) -> tuple[CaseManifest | None, dict[str, Any] | None]:
+def _phase_error(current: Phase, target: Phase) -> dict[str, Any]:
+    return envelope(
+        ok=False,
+        code="invalid-phase",
+        message=f"cannot advance from {current} to {target}",
+    )
+
+
+def _advance(
+    case_root: Path, *targets: Phase, operation_id: str | None = None
+) -> tuple[CaseManifest | None, dict[str, Any] | None]:
     manifest = load_manifest(case_root)
     for target in targets:
         if manifest.phase == target:
@@ -98,12 +128,33 @@ def _advance(case_root: Path, *targets: Phase) -> tuple[CaseManifest | None, dic
         try:
             manifest = advance_phase(manifest, target)
         except InvalidTransition:
-            return None, envelope(
-                ok=False,
-                code="invalid-phase",
-                message=f"cannot advance from {manifest.phase} to {target}",
-            )
-    return save_manifest(case_root, manifest), None
+            return None, _phase_error(manifest.phase, target)
+    return save_manifest(case_root, manifest, operation_id=operation_id), None
+
+
+def _stale(manifest: CaseManifest, *keys: str) -> CaseManifest:
+    lineage = dict(manifest.lineage)
+    for key in keys:
+        if key in lineage:
+            lineage[key] = lineage[key].model_copy(update={"stale": True})
+    return manifest.model_copy(update={"lineage": lineage})
+
+
+def _check_portrait_ref(case_root: Path, ref: str) -> dict[str, Any] | None:
+    if not ref:
+        return None
+    raw = Path(ref)
+    if raw.is_absolute() or ".." in raw.parts:
+        return envelope(
+            ok=False, code="path-rejected", message="portrait_ref must stay inside the case"
+        )
+    try:
+        contained_path(case_root, *raw.parts)
+    except (PathRejected, OSError, ValueError):
+        return envelope(
+            ok=False, code="path-rejected", message="portrait_ref must stay inside the case"
+        )
+    return None
 
 
 def _canonical_path(case_root: Path) -> Path:
@@ -138,7 +189,14 @@ def _rel(case_root: Path, path: Path) -> str:
     return path.relative_to(case_root).as_posix()
 
 
-def _record_lineage(case_root: Path, key: str, source: Path, artifact: Path) -> CaseManifest:
+def _record_lineage(
+    case_root: Path,
+    key: str,
+    source: Path,
+    artifact: Path,
+    *,
+    operation_id: str | None = None,
+) -> CaseManifest:
     manifest = load_manifest(case_root)
     lineage = dict(manifest.lineage)
     lineage[key] = Lineage(
@@ -147,7 +205,9 @@ def _record_lineage(case_root: Path, key: str, source: Path, artifact: Path) -> 
         stale=False,
         source_path=_rel(case_root, source),
     )
-    return save_manifest(case_root, manifest.model_copy(update={"lineage": lineage}))
+    return save_manifest(
+        case_root, manifest.model_copy(update={"lineage": lineage}), operation_id=operation_id
+    )
 
 
 def bind_tools(ctx: ToolContext) -> list[Any]:
@@ -183,6 +243,16 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             return envelope(
                 ok=False, code="field-too-long", message="a brief field exceeds the size limit"
             )
+        rejected = _check_portrait_ref(case_root, portrait_ref)
+        if rejected:
+            return rejected
+        manifest = load_manifest(case_root)
+        if manifest.phase not in BRIEF_PHASES:
+            return _phase_error(manifest.phase, Phase.draft)
+        if manifest.phase == Phase.draft:
+            save_manifest(
+                case_root, apply_input_change(manifest), operation_id=ctx.next_op("save_brief")
+            )
         brief = CaseBrief(
             experience_goal=experience_goal,
             player_role=player_role,
@@ -201,7 +271,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
         )
         path = contained_path(case_root, WORK_DIR, "brief.md")
         atomic_write(path, _brief_markdown(brief))
-        manifest, err = _advance(case_root, Phase.intake, Phase.draft)
+        manifest, err = _advance(
+            case_root, Phase.intake, Phase.draft, operation_id=ctx.next_op("save_brief")
+        )
         if err:
             return err
         assert manifest is not None
@@ -215,6 +287,7 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
                     )
                 }
             ),
+            operation_id=ctx.next_op("save_brief"),
         )
         return envelope(
             ok=True,
@@ -236,7 +309,10 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             path = contained_path(case_root, "02-drafts", "story.md")
             atomic_write(path, markdown)
             return envelope(
-                ok=True, artifact_refs=[_rel(case_root, path)], hashes={"draft": file_sha256(path)}
+                ok=True,
+                artifact_refs=[_rel(case_root, path)],
+                hashes={"draft": file_sha256(path)},
+                revision=load_manifest(case_root).revision,
             )
         try:
             text = roundtrip(parse_canonical(markdown))
@@ -248,16 +324,29 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
                 message=str(exc)
                 + "; escape heading-style lines with a backslash, for example \\## Title",
             )
+        rejected = _check_portrait_ref(case_root, text.brief.delivery.portrait_ref or "")
+        if rejected:
+            return rejected
+        manifest = load_manifest(case_root)
+        if manifest.phase not in CANONICAL_PHASES:
+            return _phase_error(manifest.phase, Phase.final_text)
         path = _canonical_path(case_root)
         atomic_write(path, rendered)
-        manifest, err = _advance(case_root, Phase.final_text)
-        if err:
-            return err
-        assert manifest is not None
+        if manifest.phase in {Phase.build, Phase.official_check, Phase.validate}:
+            updated = _stale(manifest, "character", "lorebook", "png")
+            updated = rewind_phase(updated, Phase.final_text)
+            saved = save_manifest(case_root, updated, operation_id=ctx.next_op("save_content"))
+        else:
+            saved, err = _advance(
+                case_root, Phase.final_text, operation_id=ctx.next_op("save_content")
+            )
+            if err:
+                return err
+            assert saved is not None
         return envelope(
             ok=True,
             artifact_refs=[_rel(case_root, path)],
-            revision=manifest.revision,
+            revision=saved.revision,
             hashes={"canonical": file_sha256(path)},
         )
 
@@ -271,6 +360,8 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
                 ok=False, code="missing-character", message="canonical character is missing"
             )
         manifest = load_manifest(case_root)
+        if manifest.phase not in BUILD_PHASES:
+            return _phase_error(manifest.phase, Phase.build)
         lorebook = (
             loaded.lorebook
             if manifest.delivery.lorebook in {LorebookDelivery.embedded, LorebookDelivery.both}
@@ -288,15 +379,32 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
         if not result.ok:
             ctx.format_repairs += 1
             return envelope(ok=False, code="validation-failed", issues=result.issues)
-        manifest, err = _advance(case_root, Phase.build)
-        if err:
-            return err
         artifact = exported[0]
-        _record_lineage(case_root, "character", _canonical_path(case_root), artifact)
+        _record_lineage(
+            case_root,
+            "character",
+            _canonical_path(case_root),
+            artifact,
+            operation_id=ctx.next_op("build_character_card"),
+        )
+        current = load_manifest(case_root)
+        if current.phase in {Phase.official_check, Phase.validate}:
+            current = rewind_phase(_stale(current, "png"), Phase.build)
+            current = save_manifest(
+                case_root, current, operation_id=ctx.next_op("build_character_card")
+            )
+        else:
+            current, err = _advance(
+                case_root, Phase.build, operation_id=ctx.next_op("build_character_card")
+            )
+            if err:
+                return err
+            assert current is not None
         return envelope(
             ok=True,
             artifact_refs=[_rel(case_root, artifact)],
             hashes={"card": file_sha256(artifact)},
+            revision=current.revision,
         )
 
     @tool
@@ -306,7 +414,13 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             return loaded
         manifest = load_manifest(case_root)
         if manifest.delivery.lorebook in {LorebookDelivery.none, LorebookDelivery.embedded}:
-            return envelope(ok=True, message="no standalone lorebook requested")
+            return envelope(
+                ok=True,
+                message="no standalone lorebook requested",
+                revision=manifest.revision,
+            )
+        if manifest.phase not in BUILD_PHASES:
+            return _phase_error(manifest.phase, Phase.build)
         if loaded.lorebook is None:
             return envelope(
                 ok=False, code="missing-lorebook", message="canonical lorebook is missing"
@@ -322,12 +436,32 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             ctx.format_repairs += 1
             return envelope(ok=False, code="validation-failed", issues=result.issues)
         artifact = exported[0]
-        _record_lineage(case_root, "lorebook", _canonical_path(case_root), artifact)
-        _advance(case_root, Phase.build)
+        _record_lineage(
+            case_root,
+            "lorebook",
+            _canonical_path(case_root),
+            artifact,
+            operation_id=ctx.next_op("build_lorebook"),
+        )
+        current = load_manifest(case_root)
+        if current.phase in {Phase.official_check, Phase.validate}:
+            current = save_manifest(
+                case_root,
+                rewind_phase(current, Phase.build),
+                operation_id=ctx.next_op("build_lorebook"),
+            )
+        else:
+            current, err = _advance(
+                case_root, Phase.build, operation_id=ctx.next_op("build_lorebook")
+            )
+            if err:
+                return err
+            assert current is not None
         return envelope(
             ok=True,
             artifact_refs=[_rel(case_root, artifact)],
             hashes={"lorebook": file_sha256(artifact)},
+            revision=current.revision,
         )
 
     @tool
@@ -337,7 +471,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             return loaded
         manifest = load_manifest(case_root)
         if manifest.delivery.card not in {CardDelivery.png, CardDelivery.both}:
-            return envelope(ok=True, message="no PNG card requested")
+            return envelope(ok=True, message="no PNG card requested", revision=manifest.revision)
+        if manifest.phase not in BUILD_PHASES:
+            return _phase_error(manifest.phase, Phase.build)
         card_path = case_root / "04-exports" / "character-cards" / "card.json"
         if not card_path.is_file():
             return envelope(ok=False, code="missing-card", message="JSON card must be built first")
@@ -354,16 +490,39 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             ctx.format_repairs += 1
             return envelope(ok=False, code="validation-failed", issues=result.issues)
         artifact = exported[0]
-        _record_lineage(case_root, "png", _canonical_path(case_root), artifact)
-        _advance(case_root, Phase.build)
+        _record_lineage(
+            case_root,
+            "png",
+            _canonical_path(case_root),
+            artifact,
+            operation_id=ctx.next_op("build_png_card"),
+        )
+        current = load_manifest(case_root)
+        if current.phase in {Phase.official_check, Phase.validate}:
+            current = save_manifest(
+                case_root,
+                rewind_phase(current, Phase.build),
+                operation_id=ctx.next_op("build_png_card"),
+            )
+        else:
+            current, err = _advance(
+                case_root, Phase.build, operation_id=ctx.next_op("build_png_card")
+            )
+            if err:
+                return err
+            assert current is not None
         return envelope(
             ok=True,
             artifact_refs=[_rel(case_root, artifact)],
             hashes={"png": file_sha256(artifact)},
+            revision=current.revision,
         )
 
     @tool
     def check_official_sources() -> dict[str, Any]:
+        manifest = load_manifest(case_root)
+        if manifest.phase not in SOURCE_PHASES:
+            return _phase_error(manifest.phase, Phase.official_check)
         service = ctx.source_service or OfficialSourceService()
         owned = ctx.source_service is None
         checks = []
@@ -383,15 +542,20 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
                 service.close()
         path = contained_path(case_root, WORK_DIR, "official-evidence.json")
         atomic_write(path, json.dumps(checks, indent=2))
-        manifest, err = _advance(case_root, Phase.official_check)
-        if err:
-            return err
         ok = bool(checks) and all(item["status"] == "pass" for item in checks)
+        saved = manifest
+        if ok:
+            saved, err = _advance(
+                case_root, Phase.official_check, operation_id=ctx.next_op("check_official_sources")
+            )
+            if err:
+                return err
+            assert saved is not None
         return envelope(
             ok=ok,
             code=None if ok else "source-changed",
             artifact_refs=[_rel(case_root, path)],
-            revision=None if manifest is None else manifest.revision,
+            revision=saved.revision,
         )
 
     @tool
@@ -402,26 +566,34 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             if ctx.format_repairs > MAX_FORMAT_REPAIRS:
                 return envelope(ok=False, code="repair-exhausted", issues=result.issues)
             return envelope(ok=False, code="validation-failed", issues=result.issues)
-        manifest, err = _advance(case_root, Phase.validate)
+        if load_manifest(case_root).phase not in VALIDATE_PHASES:
+            return _phase_error(load_manifest(case_root).phase, Phase.validate)
+        saved, err = _advance(
+            case_root, Phase.validate, operation_id=ctx.next_op("validate_deliverables")
+        )
         if err:
             return err
-        return envelope(ok=True, revision=None if manifest is None else manifest.revision)
+        return envelope(ok=True, revision=None if saved is None else saved.revision)
 
     @tool
     def finish_case() -> dict[str, Any]:
         result = run_delivery_checks(case_root)
         if not result.ok:
             return envelope(ok=False, code="delivery-gate", issues=result.issues)
-        _advance(case_root, Phase.delivery)
+        saved, err = _advance(case_root, Phase.delivery, operation_id=ctx.next_op("finish_case"))
+        if err:
+            return err
         exported = sorted((case_root / "04-exports").rglob("*"))
         refs = [_rel(case_root, path) for path in exported if path.is_file()]
-        story = load_manifest(case_root).story_name
-        lines = [f"# {story}", "", "Case state: closed.", "", "Deliverables:"]
-        lines.extend(f"- {ref}" for ref in refs)
-        atomic_write(case_root / "README.md", "\n".join(lines) + "\n")
-        close_case(case_root)
+        close_case(case_root, deliverables=refs)
+        if (case_root / WORK_DIR / "case.json").is_file():
+            return envelope(ok=False, code="cleanup-pending", artifact_refs=refs)
         ctx.finish_ok = True
-        return envelope(ok=True, artifact_refs=refs)
+        return envelope(
+            ok=True,
+            artifact_refs=refs,
+            revision=None if saved is None else saved.revision,
+        )
 
     return [
         save_brief,
@@ -444,7 +616,9 @@ def _brief_markdown(brief: CaseBrief) -> str:
 def _portrait_path(case_root: Path, doc: CanonicalDocument) -> Path | None:
     ref = doc.brief.delivery.portrait_ref
     if ref:
-        candidate = case_root / ref
+        if _check_portrait_ref(case_root, ref):
+            return None
+        candidate = contained_path(case_root, *Path(ref).parts)
         if candidate.is_file():
             return candidate
     manifest = load_manifest(case_root)

@@ -84,6 +84,14 @@ def test_input_change_returns_to_intake_and_marks_lineage_stale() -> None:
     assert updated.lineage["character"].stale is True
 
 
+def test_rewind_content_phase_to_final_text() -> None:
+    from st_agent.application.lifecycle import rewind_phase
+
+    rewound = rewind_phase(_manifest(Phase.official_check), Phase.final_text)
+    assert rewound.phase == Phase.final_text
+    assert rewound.condition == Condition.active
+
+
 def test_cleanup_pending_sets_cleanup_phase() -> None:
     pending = mark_cleanup_pending(_manifest(Phase.delivery))
     assert pending.phase == Phase.cleanup

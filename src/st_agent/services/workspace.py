@@ -144,7 +144,7 @@ def _recover_temps(case_root: Path) -> None:
 
 @contextmanager
 def case_lock(case_root: Path):
-    lock_path = contained_path(case_root, WORK_DIR, "case.lock")
+    lock_path = canonicalize_root(case_root) / "case.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     handle = lock_path.open("a+b")
     if handle.tell() == 0:
@@ -425,12 +425,26 @@ def _remove_work(work: Path) -> None:
     work.rmdir()
 
 
-def close_case(case_root: Path, *, state: str = "closed") -> None:
+def close_case(
+    case_root: Path, *, state: str = "closed", deliverables: Sequence[str] | None = None
+) -> None:
     story = case_root.name
     if (case_root / WORK_DIR / "case.json").is_file():
         story = load_manifest(case_root).story_name
-    atomic_write(case_root / "README.md", _readme(story, state=state))
-    _remove_work(case_root / WORK_DIR)
+    if deliverables:
+        lines = [f"# {story}", "", f"Case state: {state}.", "", "Deliverables:"]
+        lines.extend(f"- {item}" for item in deliverables)
+        atomic_write(case_root / "README.md", "\n".join(lines) + "\n")
+    else:
+        atomic_write(case_root / "README.md", _readme(story, state=state))
+    try:
+        _remove_work(case_root / WORK_DIR)
+    except OSError:
+        if (case_root / WORK_DIR / "case.json").is_file():
+            pending = load_manifest(case_root).model_copy(
+                update={"phase": Phase.cleanup, "condition": Condition.cleanup_pending}
+            )
+            save_manifest(case_root, pending)
 
 
 def abandon_case(case_root: Path) -> None:
