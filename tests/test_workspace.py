@@ -16,6 +16,7 @@ from st_agent.services.workspace import (
     LimitExceeded,
     PathRejected,
     UnsupportedInput,
+    WorkspaceError,
     atomic_write,
     case_lock,
     close_case,
@@ -295,6 +296,21 @@ def test_close_removes_work_keeps_assets(tmp_path: Path) -> None:
     with pytest.raises(ClosedCaseError):
         resume_case(case_root)
     assert not (case_root / "00-work" / "intake.md").exists()
+
+
+def test_load_manifest_wraps_invalid_json(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    (case_root / "00-work" / "case.json").write_text("{not-json", encoding="utf-8")
+    with pytest.raises(WorkspaceError, match="unreadable"):
+        load_manifest(case_root)
+
+
+def test_load_manifest_wraps_non_utf8_readme(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    shutil.rmtree(case_root / "00-work")
+    (case_root / "README.md").write_bytes(b"\xff\xfe abandoned\n")
+    with pytest.raises(WorkspaceError, match="unreadable"):
+        load_manifest(case_root)
 
 
 def _link_directory(link: Path, target: Path) -> str:

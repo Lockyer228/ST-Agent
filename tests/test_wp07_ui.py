@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -264,3 +265,41 @@ def test_product_page_rejects_empty_send(
     assert calls == []
     page = "\n".join(str(item.value) for item in [*at.error, *at.markdown, *at.text])
     assert "Message is empty." in page
+
+
+def test_product_page_shows_unreadable_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("st_agent.ui.app.load_local_env", lambda: None)
+    from streamlit.testing.v1 import AppTest
+
+    case_root = create_case(tmp_path, "harbor-watch")
+    (case_root / "00-work" / "case.json").write_text("{not-json", encoding="utf-8")
+    script = Path(__file__).resolve().parents[1] / "app.py"
+    at = AppTest.from_file(str(script), default_timeout=20)
+    at.run()
+    at.text_input[2].input(str(case_root))
+    next(item for item in at.button if item.label == "Resume case").click().run()
+    assert not at.exception
+    page = "\n".join(str(item.value) for item in [*at.error, *at.markdown, *at.text])
+    assert "case manifest is unreadable" in page
+
+
+def test_product_page_shows_unreadable_closed_readme(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("st_agent.ui.app.load_local_env", lambda: None)
+    from streamlit.testing.v1 import AppTest
+
+    case_root = create_case(tmp_path, "harbor-watch")
+    shutil.rmtree(case_root / "00-work")
+    (case_root / "README.md").write_bytes(b"\xff\xfe abandoned\n")
+    script = Path(__file__).resolve().parents[1] / "app.py"
+    at = AppTest.from_file(str(script), default_timeout=20)
+    at.run()
+    at.text_input[2].input(str(case_root))
+    next(item for item in at.button if item.label == "Resume case").click().run()
+    assert not at.exception
+    page = "\n".join(str(item.value) for item in [*at.error, *at.markdown, *at.text])
+    assert "case manifest is unreadable" in page
+    assert "Deliverables stay on disk." in page

@@ -86,6 +86,7 @@ def _home() -> None:
             st.rerun()
         except (OSError, WorkspaceError) as exc:
             st.session_state.error = str(exc)
+            st.error(str(exc))
 
 
 def _case_page(case_root: Path) -> None:
@@ -94,6 +95,9 @@ def _case_page(case_root: Path) -> None:
     try:
         manifest = load_manifest(case_root)
     except ClosedCaseError:
+        closed = True
+    except WorkspaceError as exc:
+        st.error(str(exc))
         closed = True
 
     st.caption(str(case_root))

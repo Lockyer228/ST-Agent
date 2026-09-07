@@ -238,11 +238,17 @@ def load_manifest(case_root: Path) -> CaseManifest:
     if not path.is_file():
         readme = case_root / "README.md"
         if readme.is_file():
-            text = readme.read_text(encoding="utf-8").lower()
+            try:
+                text = readme.read_text(encoding="utf-8").lower()
+            except UnicodeDecodeError as exc:
+                raise WorkspaceError("case manifest is unreadable") from exc
             if "closed" in text or "abandoned" in text:
                 raise ClosedCaseError("closed case cannot restore Q&A")
         raise ClosedCaseError("no active case manifest")
-    return CaseManifest.model_validate_json(path.read_text(encoding="utf-8"))
+    try:
+        return CaseManifest.model_validate_json(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise WorkspaceError("case manifest is unreadable") from exc
 
 
 def save_manifest(
