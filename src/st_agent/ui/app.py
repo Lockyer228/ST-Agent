@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from st_agent.services.workspace import (
     resume_case,
 )
 from st_agent.ui.view import (
+    empty_turn_error,
     next_operation_id,
     parse_deliverables,
     preview_upload,
@@ -168,6 +170,11 @@ def _case_page(case_root: Path) -> None:
 
 def _submit(case_root: Path, message: str, uploads) -> None:
     st.session_state.error = ""
+    blocked = empty_turn_error(message, len(uploads))
+    if blocked:
+        st.session_state.error = blocked
+        return
+    tmp: Path | None = None
     try:
         manifest = load_manifest(case_root)
         saved: list[Path] = []
@@ -188,6 +195,9 @@ def _submit(case_root: Path, message: str, uploads) -> None:
     except (OSError, WorkspaceError) as exc:
         st.session_state.error = str(exc)
         return
+    finally:
+        if tmp is not None:
+            shutil.rmtree(tmp, ignore_errors=True)
     st.session_state.events = sanitize_events(events)
     st.session_state.outcome_kind = outcome.kind
     st.session_state.outcome_message = outcome.message

@@ -12,6 +12,7 @@ from st_agent.services.readers import UnsupportedInput
 from st_agent.services.workspace import PathRejected, create_case, load_manifest
 from st_agent.ui.view import (
     EVENT_PREFIXES,
+    empty_turn_error,
     next_operation_id,
     parse_deliverables,
     preview_upload,
@@ -89,6 +90,13 @@ def test_read_deliverable_rejects_work_dir(tmp_path: Path) -> None:
         read_deliverable(case_root, "00-work/case.json")
     with pytest.raises(PathRejected):
         read_deliverable(case_root, "04-exports/../00-work/case.json")
+
+
+def test_empty_turn_error_blocks_blank_message_without_uploads() -> None:
+    assert empty_turn_error("", 0) == "Message is empty."
+    assert empty_turn_error("   ", 0) == "Message is empty."
+    assert empty_turn_error("A tavern keeper.", 0) is None
+    assert empty_turn_error("", 1) is None
 
 
 def test_write_upload_keeps_basename_only(tmp_path: Path) -> None:
@@ -201,3 +209,31 @@ def test_product_page_creates_and_resumes_case(
     )
     assert "setup" in page
     assert "Resume:" in page
+
+
+def test_product_page_rejects_empty_send(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from st_agent.outcomes import TurnOutcome
+
+    calls: list[int] = []
+
+    def fake_submit(*args, **kwargs):
+        calls.append(1)
+        return TurnOutcome(kind="question", message="should not run"), []
+
+    monkeypatch.setattr("st_agent.ui.app.load_local_env", lambda: None)
+    monkeypatch.setattr("st_agent.ui.app.submit_turn", fake_submit)
+    from streamlit.testing.v1 import AppTest
+
+    script = Path(__file__).resolve().parents[1] / "app.py"
+    at = AppTest.from_file(str(script), default_timeout=20)
+    at.run()
+    at.text_input[0].input(str(tmp_path))
+    at.text_input[1].input("harbor-watch")
+    next(item for item in at.button if item.label == "Create case").click().run()
+    next(item for item in at.button if item.label == "Send").click().run()
+    assert not at.exception
+    assert calls == []
+    page = "\n".join(str(item.value) for item in [*at.error, *at.markdown, *at.text])
+    assert "Message is empty." in page

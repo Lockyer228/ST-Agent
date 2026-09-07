@@ -86,6 +86,12 @@ def next_operation_id(store: dict[str, int]) -> str:
     return f"ui-{store['submit_n']}"
 
 
+def empty_turn_error(message: str, upload_count: int) -> str | None:
+    if not message.strip() and upload_count == 0:
+        return "Message is empty."
+    return None
+
+
 def write_upload(folder: Path, name: str, data: bytes) -> Path:
     safe = PureWindowsPath(name).name
     if safe in {"", ".", ".."}:
