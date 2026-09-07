@@ -22,8 +22,8 @@ from st_agent.services.workspace import (
 )
 from st_agent.ui.view import (
     empty_turn_error,
+    list_readme_deliverables,
     next_operation_id,
-    parse_deliverables,
     preview_upload,
     read_deliverable,
     sanitize_events,
@@ -213,7 +213,7 @@ def _downloads(case_root: Path, *, closed: bool) -> None:
     readme = case_root / "README.md"
     if not readme.is_file():
         return
-    refs = parse_deliverables(readme.read_text(encoding="utf-8"))
+    refs = list_readme_deliverables(readme)
     if not refs and not closed:
         return
     if refs:

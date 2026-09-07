@@ -7,7 +7,8 @@ from pathlib import Path, PureWindowsPath
 from st_agent.services.readers import sniff_bytes
 from st_agent.services.workspace import PathRejected, contained_path
 
-EVENT_PREFIXES = ("tool-start:", "tool-success:", "tool-failure:", "invocation-complete")
+EVENT_PREFIXES = ("tool-start:", "tool-success:", "tool-failure:")
+_EXACT_EVENTS = frozenset({"invocation-complete", "idempotent"})
 
 _BLOCKER_HELP = {
     "b-ai-credentials-missing": (
@@ -32,7 +33,10 @@ def preview_upload(name: str, data: bytes) -> str:
 def sanitize_events(events: list[str]) -> list[str]:
     kept: list[str] = []
     for item in events:
-        if item == "idempotent" or item.startswith(EVENT_PREFIXES):
+        if item in _EXACT_EVENTS:
+            kept.append(item)
+            continue
+        if any(item.startswith(prefix) and item != prefix for prefix in EVENT_PREFIXES):
             kept.append(item)
     return kept
 
@@ -56,6 +60,13 @@ def parse_deliverables(readme: str) -> list[str]:
         if stripped:
             break
     return refs
+
+
+def list_readme_deliverables(readme: Path) -> list[str]:
+    try:
+        return parse_deliverables(readme.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError):
+        return []
 
 
 def read_deliverable(case_root: Path, relative: str) -> bytes:

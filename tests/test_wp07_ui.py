@@ -62,7 +62,23 @@ def test_sanitize_events_keeps_only_safe_names() -> None:
         "idempotent",
         "tool-failure:finish_case",
     ]
-    assert all(item.startswith(EVENT_PREFIXES) or item == "idempotent" for item in kept)
+    assert all(
+        item.startswith(("tool-start:", "tool-success:", "tool-failure:"))
+        or item in {"idempotent", "invocation-complete"}
+        for item in kept
+    )
+
+
+def test_sanitize_events_rejects_prefix_extension() -> None:
+    kept = sanitize_events(
+        [
+            "invocation-complete-and-prompt",
+            "tool-start:",
+            "tool-start:save_brief",
+            "tool-success",
+        ]
+    )
+    assert kept == ["tool-start:save_brief"]
 
 
 def test_parse_deliverables_ignores_escape() -> None:
@@ -73,6 +89,14 @@ def test_parse_deliverables_ignores_escape() -> None:
         "- 00-work/brief.md\n"
     )
     assert parse_deliverables(text) == ["04-exports/character-cards/card.json"]
+
+
+def test_list_readme_deliverables_ignores_non_utf8(tmp_path: Path) -> None:
+    from st_agent.ui.view import list_readme_deliverables
+
+    readme = tmp_path / "README.md"
+    readme.write_bytes(b"\xff\xfe Deliverables:\n- 04-exports/card.json\n")
+    assert list_readme_deliverables(readme) == []
 
 
 def test_read_deliverable_returns_exact_bytes(tmp_path: Path) -> None:
@@ -155,7 +179,10 @@ def test_question_envelope_feeds_status_guidance(tmp_path: Path) -> None:
         manifest.condition, None, manifest.pending_question
     )
     kept = sanitize_events(events)
-    assert all(item.startswith(EVENT_PREFIXES) or item == "idempotent" for item in kept)
+    assert all(
+        item.startswith(EVENT_PREFIXES) or item in {"idempotent", "invocation-complete"}
+        for item in kept
+    )
     assert not any(item.startswith(("prompt:", "reasoning:")) for item in kept)
 
 
