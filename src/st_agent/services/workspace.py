@@ -15,6 +15,7 @@ from PIL import Image, UnidentifiedImageError
 
 from st_agent.domain.case import (
     CaseManifest,
+    CaseMode,
     Condition,
     DeliveryPreference,
     Phase,
@@ -201,6 +202,7 @@ def create_case(
     story_name: str,
     *,
     source_root: Path | None = None,
+    mode: CaseMode | str = CaseMode.new,
 ) -> Path:
     _assert_not_inside_source(workspace_root, source_root or package_source_root())
     parent = canonicalize_root(workspace_root)
@@ -214,7 +216,7 @@ def create_case(
     manifest = CaseManifest(
         case_id=uuid.uuid4().hex,
         story_name=slugify(story_name),
-        mode="new",
+        mode=CaseMode(mode),
         phase=Phase.setup,
         condition=Condition.active,
         revision=0,

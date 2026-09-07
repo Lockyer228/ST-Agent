@@ -6,7 +6,7 @@ This repository is the **product source**. Shared planning and collaboration fil
 
 **Acceptance platform:** Windows. Application paths use `pathlib` and avoid POSIX-only assumptions. Other operating systems are not promised without evidence.
 
-This baseline provides install, configuration, test, static-check, and Streamlit shell entry points. Character-card and lorebook workflows are not implemented yet.
+This baseline provides install, configuration, test, static-check, and Streamlit product-page entry points.
 
 ## Requirements
 
@@ -57,7 +57,7 @@ User content that later work packages send to B-AI is untrusted story material. 
 uv run streamlit run app.py
 ```
 
-The shell starts a local Streamlit page. It shows the runtime version, provider, base URL, and model ID. It does not create cases or write user files.
+The shell starts a local Streamlit page. Create or resume a case, send a message with optional uploads, watch sanitized tool events, and download exported files. Story text is sent to B-AI. API keys stay in the environment.
 
 ## Test
 
@@ -65,7 +65,7 @@ The shell starts a local Streamlit page. It shows the runtime version, provider,
 uv run pytest
 ```
 
-Baseline smoke tests cover package import, environment settings without credentials, `pathlib` application paths, and the Streamlit shell module.
+Baseline smoke tests cover package import, environment settings without credentials, `pathlib` application paths, and the Streamlit app module.
 
 ## Static check
 
@@ -76,7 +76,7 @@ uv run ruff check src tests app.py
 ## Data, paths, and cleanup
 
 - Credentials, local workspaces, generated cases, internal planning, and private reference material stay outside runtime source and logs.
-- This baseline does not write user case files and does not overwrite originals.
+- Case files live in a user-chosen workspace folder. The app does not overwrite user originals.
 - Later work packages must keep user originals, preserve unrelated unknown fields, and write uniquely named outputs.
 - Do not place a user workspace inside the application source tree.
 - Case folders use the approved English layout (`00-work/` through `04-exports/`). `case.json` is the recoverable state; `status.md` is generated from it.
