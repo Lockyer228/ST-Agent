@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from st_agent.services.readers import sniff_bytes
 from st_agent.services.workspace import PathRejected, contained_path
@@ -87,7 +87,9 @@ def next_operation_id(store: dict[str, int]) -> str:
 
 
 def write_upload(folder: Path, name: str, data: bytes) -> Path:
-    safe = Path(name).name or "upload.bin"
+    safe = PureWindowsPath(name).name
+    if safe in {"", ".", ".."}:
+        safe = "upload.bin"
     path = folder / safe
     path.write_bytes(data)
     return path

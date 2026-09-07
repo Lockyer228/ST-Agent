@@ -95,6 +95,11 @@ def test_write_upload_keeps_basename_only(tmp_path: Path) -> None:
     dest = write_upload(tmp_path, r"..\secret.txt", b"plain")
     assert dest == tmp_path / "secret.txt"
     assert dest.read_bytes() == b"plain"
+    slash = write_upload(tmp_path, "../notes.txt", b"slash")
+    assert slash == tmp_path / "notes.txt"
+    fallback = write_upload(tmp_path, "..", b"dots")
+    assert fallback == tmp_path / "upload.bin"
+    assert fallback.read_bytes() == b"dots"
 
 
 def test_status_guidance_is_english_and_actionable() -> None:
