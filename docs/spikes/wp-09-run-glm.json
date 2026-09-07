@@ -1,0 +1,12 @@
+{
+  "provider": "B-AI",
+  "base_url": "https://api.b.ai/v1",
+  "preferred_model": "glm-5.3-flash",
+  "key_present": true,
+  "note": "90s live budget. No tool-start events before timeout. Secrets omitted.",
+  "elapsed_s": 90.6,
+  "result": "blocked",
+  "blocker": "b-ai-models-unavailable",
+  "exports": [],
+  "events": ["invocation-complete"]
+}

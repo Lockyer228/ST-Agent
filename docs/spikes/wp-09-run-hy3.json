@@ -1,0 +1,41 @@
+{
+  "provider": "B-AI",
+  "base_url": "https://api.b.ai/v1",
+  "preferred_model": "hy3",
+  "key_present": true,
+  "note": "Default hy3 burned the 90s live budget. Provider logged that reasoningContent is not supported on Chat Completions multi-turn. Fallback did not start. Tool events show brief and content progress, then timeout. No exports. Secrets omitted.",
+  "turns": [
+    {
+      "n": 1,
+      "kind": "blocked",
+      "blocker": "b-ai-models-unavailable",
+      "required_input": null,
+      "question": "",
+      "message": "timeout",
+      "artifact_refs": [],
+      "events": [
+        "tool-start:save_brief",
+        "tool-start:save_content_document",
+        "tool-start:save_content_document",
+        "tool-failure:save_content_document",
+        "tool-success:save_content_document",
+        "tool-success:save_brief",
+        "invocation-complete"
+      ]
+    }
+  ],
+  "elapsed_s": 91.4,
+  "result": "blocked",
+  "exports": [],
+  "events": [
+    "tool-start:save_brief",
+    "tool-start:save_content_document",
+    "tool-start:save_content_document",
+    "tool-failure:save_content_document",
+    "tool-success:save_content_document",
+    "tool-success:save_brief",
+    "invocation-complete"
+  ],
+  "blocker": "b-ai-models-unavailable",
+  "story": "wp-09-case-input.md"
+}

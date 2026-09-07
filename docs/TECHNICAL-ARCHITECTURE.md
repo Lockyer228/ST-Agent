@@ -30,26 +30,27 @@ P0 does not require a database, background worker, custom API server, multi-agen
 
 ```mermaid
 flowchart LR
-    U[Creator] <--> UI[Streamlit UI]
-    UI --> CC[Case Controller]
-    CC --> AR[Strands Agent Runtime]
-    AR <--> BR[B-AI (OpenAI-compatible)]
-    AR <--> TF[Bounded Tool Facade]
-    TF --> WS[Workspace Service]
-    TF --> CP[Content Pipeline]
-    TF --> FC[ST Format and PNG Codecs]
-    TF --> OV[Official Source and Validation Service]
+    U[Creator] <--> Home[Streamlit home: New or Resume]
+    Home --> Case[Case page: Send / Resume / Abandon]
+    Case --> CC[case_controller.submit_turn]
+    CC --> AR[Strands Agent plus TurnOutcome]
+    AR <--> BR[B-AI OpenAI-compatible]
+    AR <--> Tools[Eight bounded tools]
+    Tools --> WS[workspace service]
+    Tools --> CP[canonical content pipeline]
+    Tools --> FC[ST format and PNG codecs]
+    Tools --> OV[official source and validators]
     CC --> WS
-    WS --> FS[(User-selected Local Workspace)]
-    OV --> OS[Allowlisted Official Sources]
-    CP --> RR[Versioned English Rule Assets]
+    WS --> Rec[lock / atomic write / crash .tmp / close hygiene]
+    WS --> FS[(user-selected local case folder)]
+    OV --> OS[allowlisted official sources]
+    CP --> RR[English rule assets]
     FC --> FS
-    OV --> FS
-    FS --> OUT[Character Card JSON or PNG and Lorebook]
-    OUT --> UI
+    Case --> DL[Downloads from README Deliverables]
+    FS --> DL
 ```
 
-All components run in the Streamlit process for P0. B-AI (development model provider via OpenAI-compatible API) and the allowlisted official format sources are the only required network integrations.
+All components run in the Streamlit process for P0. B-AI (development model provider via OpenAI-compatible API) and the allowlisted official format sources are the only required network integrations. The eight tools are `save_brief`, `save_content_document`, `build_character_card`, `build_lorebook`, `build_png_card`, `check_official_sources`, `validate_deliverables`, and `finish_case`.
 
 ## 3. Proposed Technology Baseline
 
@@ -76,8 +77,8 @@ Application code uses `pathlib` and avoids POSIX-only shell, path, permission, a
 
 | Product module | Engineering components | Responsibility |
 | --- | --- | --- |
-| M-01 Interaction Entry | `ui/streamlit_app.py`, view models | Collect local root, messages, choices, and uploads; render questions, real progress, errors, and downloads |
-| M-02 Creation Core | `agent/runtime.py`, system prompt, rule loader, canonical content models | Understand intent, choose the next action, create content, and decide when a user answer is required |
+| M-01 Interaction Entry | `st_agent.ui.app`, `st_agent.ui.view` | Collect local root, messages, and uploads; render questions, sanitized tool events, errors, and README Deliverables downloads |
+| M-02 Creation Core | `st_agent.application.case_controller`, Strands `Agent`, English rule assets | Understand intent, choose the next action, create content, and decide when a user answer is required |
 | M-03 File and Reference Tools | bounded tool facade, input readers, format codecs, PNG codec, official source client, validators | Turn agent requests into constrained and verifiable file or reference results |
 | M-04 Case and Delivery | `application/case_controller.py`, workspace service, lifecycle policy | Persist input first, enforce transitions, recover work, gate delivery, and clean temporary case data |
 
