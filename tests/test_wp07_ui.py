@@ -13,6 +13,7 @@ from st_agent.services.readers import UnsupportedInput
 from st_agent.services.workspace import PathRejected, create_case, load_manifest
 from st_agent.ui.view import (
     EVENT_PREFIXES,
+    activity_label,
     empty_turn_error,
     next_operation_id,
     parse_deliverables,
@@ -80,6 +81,81 @@ def test_sanitize_events_rejects_prefix_extension() -> None:
         ]
     )
     assert kept == ["tool-start:save_brief"]
+
+
+def test_activity_label_covers_tools_and_hides_internals() -> None:
+    started: set[str] = set()
+    assert activity_label("tool-start:save_brief", started) == "Organizing the creative brief..."
+    assert activity_label("tool-success:save_brief", started) == "Creative brief saved."
+    assert (
+        activity_label("tool-failure:validate_deliverables:validation-failed", started)
+        == "Deliverable validation did not finish this time."
+    )
+    assert activity_label("tool-start:save_brief", started) == (
+        "Retrying: Organizing the creative brief..."
+    )
+    assert activity_label("tool-start:TurnOutcome", started) is None
+    assert activity_label("invocation-complete", started) is None
+    assert activity_label("idempotent", started) is None
+    assert activity_label("tool-start:not-a-tool", started) is None
+    assert activity_label("prompt:secret", started) is None
+    assert "save_brief" not in (activity_label("tool-start:build_lorebook", started) or "")
+    for name in (
+        "save_content_document",
+        "build_character_card",
+        "build_lorebook",
+        "build_png_card",
+        "check_official_sources",
+        "validate_deliverables",
+        "finish_case",
+    ):
+        line = activity_label(f"tool-start:{name}", started)
+        assert line
+        assert name not in line
+
+
+def test_event_sink_receives_tools_before_return(tmp_path: Path) -> None:
+    from tests.test_wp06_integration import _happy_script, _source_service
+
+    case_root = create_case(tmp_path, "harbor-watch")
+    seen: list[str] = []
+    finished = {"done": False}
+
+    def sink(event: str) -> None:
+        assert finished["done"] is False
+        seen.append(event)
+
+    outcome, events = submit_turn(
+        case_root,
+        "Make a JSON card for Mara.",
+        operation_id="op-sink",
+        model=ScriptedModel(_happy_script()),
+        source_service=_source_service(),
+        event_sink=sink,
+    )
+    finished["done"] = True
+    assert outcome.kind == "delivered"
+    assert seen == events
+    assert any(item.startswith("tool-start:save_brief") for item in seen)
+    assert any(item.startswith("tool-success:finish_case") for item in seen)
+    assert "invocation-complete" in seen
+    assert not any("prompt:" in item or "reasoning:" in item for item in seen)
+    assert not any("ST_AGENT_API_KEY" in item for item in seen)
+
+
+def test_submit_turn_without_sink_stays_compatible(tmp_path: Path) -> None:
+    from tests.test_wp06_integration import _happy_script, _source_service
+
+    case_root = create_case(tmp_path, "harbor-watch")
+    outcome, events = submit_turn(
+        case_root,
+        "Make a JSON card for Mara.",
+        operation_id="op-nosink",
+        model=ScriptedModel(_happy_script()),
+        source_service=_source_service(),
+    )
+    assert outcome.kind == "delivered"
+    assert any(item.startswith("tool-start:save_brief") for item in events)
 
 
 def test_parse_deliverables_ignores_escape() -> None:
@@ -227,7 +303,9 @@ def test_product_page_creates_and_resumes_case(
     assert not at.exception
     page = "\n".join(str(item.value) for item in [*at.markdown, *at.text, *at.warning, *at.info])
     assert "Need a portrait file." in page or "Please upload a portrait." in page
+    assert "Organizing the creative brief..." in page or "Waiting for your answer." in page
     assert "tool-start:save_brief" in page
+    assert "Agent events" not in page
     click(at, "Back to start")
     at.text_input[2].input(str(tmp_path / "harbor-watch"))
     click(at, "Resume case")

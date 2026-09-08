@@ -21,6 +21,10 @@ from st_agent.services.workspace import (
     resume_case,
 )
 from st_agent.ui.view import (
+    INITIAL_ACTIVITY,
+    WORKING_SPINNER,
+    activity_label,
+    activity_outcome_label,
     empty_turn_error,
     list_readme_deliverables,
     next_operation_id,
@@ -42,6 +46,7 @@ def _ensure_state() -> None:
     st.session_state.setdefault("idempotent", False)
     st.session_state.setdefault("submit_n", 0)
     st.session_state.setdefault("error", "")
+    st.session_state.setdefault("activity_lines", [])
 
 
 def _open_case(path: Path) -> None:
@@ -53,6 +58,7 @@ def _open_case(path: Path) -> None:
     st.session_state.outcome_blocker = ""
     st.session_state.idempotent = False
     st.session_state.error = ""
+    st.session_state.activity_lines = []
 
 
 def _home() -> None:
@@ -130,10 +136,15 @@ def _case_page(case_root: Path) -> None:
     elif st.session_state.outcome_message:
         st.info(st.session_state.outcome_message)
 
+    if st.session_state.activity_lines:
+        st.subheader("Package progress")
+        for line in st.session_state.activity_lines:
+            st.write(line)
+
     events = sanitize_events(list(st.session_state.events))
     if events:
-        st.subheader("Agent events")
-        st.text("\n".join(events))
+        with st.expander("Technical activity"):
+            st.text("\n".join(events))
 
     if not closed:
         with st.form("turn"):
@@ -188,13 +199,39 @@ def _submit(case_root: Path, message: str, uploads) -> None:
             preview_upload(item.name, data)
             saved.append(write_upload(tmp, item.name, data))
         op_id = next_operation_id(st.session_state)
-        with st.spinner("The B-AI model is working on this turn..."):
-            outcome, events = submit_turn(
-                case_root,
-                message,
-                uploads=saved,
-                operation_id=op_id,
-                expected_revision=manifest.revision,
+        started: set[str] = set()
+        activity = [INITIAL_ACTIVITY]
+        st.session_state.activity_lines = list(activity)
+
+        def sink(event: str) -> None:
+            line = activity_label(event, started)
+            if line:
+                activity.append(line)
+                st.session_state.activity_lines = list(activity)
+                status.write(line)
+
+        with st.status(INITIAL_ACTIVITY, expanded=True) as status:
+            with st.spinner(WORKING_SPINNER):
+                outcome, events = submit_turn(
+                    case_root,
+                    message,
+                    uploads=saved,
+                    operation_id=op_id,
+                    expected_revision=manifest.revision,
+                    event_sink=sink,
+                )
+            if len(activity) == 1:
+                for event in events:
+                    line = activity_label(event, started)
+                    if line:
+                        activity.append(line)
+                        status.write(line)
+            final = activity_outcome_label(outcome.kind)
+            activity.append(final)
+            st.session_state.activity_lines = list(activity)
+            status.update(
+                label=final,
+                state="complete" if outcome.kind in {"delivered", "question"} else "error",
             )
     except (OSError, WorkspaceError) as exc:
         st.session_state.error = str(exc)

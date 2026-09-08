@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import threading
 import uuid
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -99,6 +99,7 @@ def submit_turn(
     expected_revision: int | None = None,
     model: Model | None = None,
     source_service: OfficialSourceService | None = None,
+    event_sink: Callable[[str], None] | None = None,
 ) -> tuple[TurnOutcome, list[str]]:
     case_root = canonicalize_root(case_root)
     try:
@@ -111,6 +112,7 @@ def submit_turn(
                 expected_revision=expected_revision,
                 model=model,
                 source_service=source_service,
+                event_sink=event_sink,
             )
     except CaseLocked:
         return (
@@ -128,6 +130,7 @@ def _submit_locked(
     expected_revision: int | None,
     model: Model | None,
     source_service: OfficialSourceService | None,
+    event_sink: Callable[[str], None] | None = None,
 ) -> tuple[TurnOutcome, list[str]]:
     cached = _load_cached(case_root, operation_id)
     if cached is not None:
@@ -162,7 +165,7 @@ def _submit_locked(
         operation_id=operation_id,
         source_service=source_service,
     )
-    hooks = SanitizedHooks()
+    hooks = SanitizedHooks(event_sink)
     system_prompt, user_prompt = assemble_prompt(case_root, message)
     tools = bind_tools(ctx)
 

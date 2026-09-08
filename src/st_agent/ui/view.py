@@ -9,6 +9,38 @@ from st_agent.services.workspace import PathRejected, contained_path
 
 EVENT_PREFIXES = ("tool-start:", "tool-success:", "tool-failure:")
 _EXACT_EVENTS = frozenset({"invocation-complete", "idempotent"})
+INITIAL_ACTIVITY = "Reading your brief and deciding what the package needs..."
+WORKING_SPINNER = "Building your character package..."
+_TOOL_RUNNING = {
+    "save_brief": "Organizing the creative brief...",
+    "save_content_document": "Drafting playable character content...",
+    "build_character_card": "Building the SillyTavern Character Card V3...",
+    "build_lorebook": "Building the requested lorebook...",
+    "build_png_card": "Embedding the character card into the portrait...",
+    "check_official_sources": "Checking current format references...",
+    "validate_deliverables": "Validating the requested files...",
+    "finish_case": "Finalizing the package...",
+}
+_TOOL_SUCCESS = {
+    "save_brief": "Creative brief saved.",
+    "save_content_document": "Character content saved.",
+    "build_character_card": "Character card built.",
+    "build_lorebook": "Lorebook built.",
+    "build_png_card": "PNG character card built.",
+    "check_official_sources": "Format references checked.",
+    "validate_deliverables": "Deliverables validated.",
+    "finish_case": "Package finalized.",
+}
+_TOOL_FAILURE = {
+    "save_brief": "Creative brief did not finish this time.",
+    "save_content_document": "Character content did not finish this time.",
+    "build_character_card": "Character card did not finish this time.",
+    "build_lorebook": "Lorebook did not finish this time.",
+    "build_png_card": "PNG character card did not finish this time.",
+    "check_official_sources": "Format reference check did not finish this time.",
+    "validate_deliverables": "Deliverable validation did not finish this time.",
+    "finish_case": "Package finalizing did not finish this time.",
+}
 
 _BLOCKER_HELP = {
     "b-ai-credentials-missing": (
@@ -42,6 +74,34 @@ def sanitize_events(events: list[str]) -> list[str]:
         if any(item.startswith(prefix) and item != prefix for prefix in EVENT_PREFIXES):
             kept.append(item)
     return kept
+
+
+def activity_label(event: str, started: set[str]) -> str | None:
+    if event in _EXACT_EVENTS:
+        return None
+    kind, _, rest = event.partition(":")
+    if kind not in {"tool-start", "tool-success", "tool-failure"} or not rest:
+        return None
+    name = rest.split(":", 1)[0]
+    if name not in _TOOL_RUNNING:
+        return None
+    if kind == "tool-start":
+        running = _TOOL_RUNNING[name]
+        if name in started:
+            return f"Retrying: {running}"
+        started.add(name)
+        return running
+    if kind == "tool-success":
+        return _TOOL_SUCCESS[name]
+    return _TOOL_FAILURE[name]
+
+
+def activity_outcome_label(kind: str) -> str:
+    if kind == "delivered":
+        return "Package delivered."
+    if kind == "question":
+        return "Waiting for your answer."
+    return "This turn could not finish."
 
 
 def parse_deliverables(readme: str) -> list[str]:

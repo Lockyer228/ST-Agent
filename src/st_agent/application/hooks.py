@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 
 from strands.hooks import AfterInvocationEvent, AfterToolCallEvent, BeforeToolCallEvent
 
@@ -85,13 +86,19 @@ def _tool_failed(result: object) -> bool:
 
 
 class SanitizedHooks:
-    def __init__(self) -> None:
+    def __init__(self, event_sink: Callable[[str], None] | None = None) -> None:
         self.events: list[str] = []
+        self._sink = event_sink
+
+    def _emit(self, event: str) -> None:
+        self.events.append(event)
+        if self._sink is not None:
+            self._sink(event)
 
     def before_tool(self, event: BeforeToolCallEvent) -> None:
         name = _tool_name(event)
         if name in TOOL_NAMES or name == "TurnOutcome":
-            self.events.append(f"tool-start:{name}")
+            self._emit(f"tool-start:{name}")
 
     def after_tool(self, event: AfterToolCallEvent) -> None:
         name = _tool_name(event)
@@ -101,12 +108,12 @@ class SanitizedHooks:
         if failed:
             code = _envelope_code(event.result)
             suffix = f":{code}" if code else ""
-            self.events.append(f"tool-failure:{name}{suffix}")
+            self._emit(f"tool-failure:{name}{suffix}")
         else:
-            self.events.append(f"tool-success:{name}")
+            self._emit(f"tool-success:{name}")
 
     def after_invocation(self, event: AfterInvocationEvent) -> None:
-        self.events.append("invocation-complete")
+        self._emit("invocation-complete")
 
     def as_list(self) -> list:
         return [self.before_tool, self.after_tool, self.after_invocation]
