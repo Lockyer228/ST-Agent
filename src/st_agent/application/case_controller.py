@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import threading
-import time
 import uuid
 from collections.abc import Sequence
 from pathlib import Path
@@ -41,6 +40,24 @@ LIVE_TIMEOUT_S = 90.0
 OPERATION_FILE = "last-operation.json"
 
 
+def try_live_model_chain(
+    model_ids: Sequence[str],
+    invoke,
+    *,
+    timeout_s: float | None = None,
+) -> tuple[TurnOutcome | None, str]:
+    """Run each authorized model with its own timeout. Fallback can still start."""
+
+    budget = LIVE_TIMEOUT_S if timeout_s is None else timeout_s
+    last_error = "unavailable"
+    for model_id in model_ids:
+        try:
+            return invoke(model_id, budget), ""
+        except Exception as exc:
+            last_error = f"{type(exc).__name__}: {exc}"[:240]
+    return None, last_error
+
+
 def _operation_path(case_root: Path) -> Path:
     return canonicalize_root(case_root) / OPERATION_FILE
 
@@ -65,10 +82,11 @@ def _store_cached(case_root: Path, operation_id: str, outcome: TurnOutcome) -> N
     )
 
 
-def _live_model(model_id: str, *, base_url: str, key: str) -> OpenAIModel:
+def _live_model(model_id: str, *, base_url: str, key: str, timeout_s: float) -> OpenAIModel:
     return OpenAIModel(
-        client_args={"api_key": key, "base_url": base_url, "timeout": 60.0},
+        client_args={"api_key": key, "base_url": base_url, "timeout": max(timeout_s, 1.0)},
         model_id=model_id,
+        params={"extra_body": {"enable_thinking": False}},
     )
 
 
@@ -197,31 +215,38 @@ def _submit_locked(
                 blocker="b-ai-credentials-missing",
             )
         else:
-            last_error = "unavailable"
-            outcome = None
-            deadline = time.perf_counter() + LIVE_TIMEOUT_S
-            for model_id in authorized_model_chain(settings.model_id):
-                remaining = deadline - time.perf_counter()
-                if remaining <= 1:
-                    last_error = "timeout"
-                    break
-                try:
-                    outcome = _invoke(
-                        _live_model(model_id, base_url=settings.base_url, key=key),
-                        user_prompt,
-                        timeout_s=remaining,
-                    )
-                    last_error = ""
-                    break
-                except Exception as exc:
-                    last_error = type(exc).__name__
-                    continue
-            if outcome is None:
-                outcome = TurnOutcome(
-                    kind="blocked",
-                    message=last_error,
-                    blocker="b-ai-models-unavailable",
+            def _live_invoke(model_id: str, timeout_s: float) -> TurnOutcome:
+                return _invoke(
+                    _live_model(
+                        model_id,
+                        base_url=settings.base_url,
+                        key=key,
+                        timeout_s=timeout_s,
+                    ),
+                    user_prompt,
+                    timeout_s=timeout_s,
                 )
+
+            outcome, last_error = try_live_model_chain(
+                authorized_model_chain(settings.model_id),
+                _live_invoke,
+            )
+            if outcome is None:
+                if "TurnOutcome is missing" in last_error:
+                    outcome = TurnOutcome(
+                        kind="blocked",
+                        message=(
+                            "The live turn reached the time budget. "
+                            "Saved files are kept; send again to continue."
+                        ),
+                        blocker="live-timeout",
+                    )
+                else:
+                    outcome = TurnOutcome(
+                        kind="blocked",
+                        message=last_error,
+                        blocker="b-ai-models-unavailable",
+                    )
     else:
         prompt = user_prompt
         last_exc: Exception | None = None
@@ -254,6 +279,17 @@ def _submit_locked(
     return outcome, hooks.events
 
 
+def _export_refs(case_root: Path) -> list[str]:
+    exports = case_root / "04-exports"
+    if not exports.is_dir():
+        return []
+    return sorted(
+        path.relative_to(case_root).as_posix()
+        for path in exports.rglob("*")
+        if path.is_file()
+    )
+
+
 def _accept_outcome(case_root: Path, ctx: ToolContext, outcome: TurnOutcome) -> TurnOutcome:
     if outcome.kind == "delivered" and not ctx.finish_ok:
         outcome = TurnOutcome(
@@ -265,6 +301,13 @@ def _accept_outcome(case_root: Path, ctx: ToolContext, outcome: TurnOutcome) -> 
     try:
         manifest = load_manifest(case_root)
     except ClosedCaseError:
+        if ctx.finish_ok:
+            refs = outcome.artifact_refs or _export_refs(case_root)
+            return TurnOutcome(
+                kind="delivered",
+                message=outcome.message or "Deliverables are ready.",
+                artifact_refs=refs,
+            )
         return outcome
     if outcome.kind == "question":
         question = (outcome.question or outcome.message).strip()

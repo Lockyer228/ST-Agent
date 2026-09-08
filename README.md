@@ -12,7 +12,7 @@ The intended user is a single local creator who already writes in American Engli
 
 ## Architecture
 
-One Streamlit process owns the UI and the agent. The one-page UI (New / Resume / Send / downloads) calls `submit_turn` only. The case controller persists the user turn, runs a fresh Strands agent against B-AI, and binds eight tools: `save_brief`, `save_content_document`, `build_character_card`, `build_lorebook`, `build_png_card`, `check_official_sources`, `validate_deliverables`, and `finish_case`. Case state lives in the user-selected folder (`case.json`). File locks, atomic writes, crash `.tmp` files, and close/abandon hygiene recover work. Delivery is gated: a model text claim cannot skip missing or invalid artifacts.
+One Streamlit process owns the UI and the agent. The one-page UI (New / Resume / Send / downloads) calls `submit_turn` only. The case controller persists the user turn, runs a fresh Strands agent against the configured OpenAI-compatible provider, and binds eight tools: `save_brief`, `save_content_document`, `build_character_card`, `build_lorebook`, `build_png_card`, `check_official_sources`, `validate_deliverables`, and `finish_case`. Case state lives in the user-selected folder (`case.json`). File locks, atomic writes, crash `.tmp` files, and close/abandon hygiene recover work. Delivery is gated: a model text claim cannot skip missing or invalid artifacts.
 
 See `docs/TECHNICAL-ARCHITECTURE.md` for the system diagram.
 
@@ -21,7 +21,7 @@ See `docs/TECHNICAL-ARCHITECTURE.md` for the system diagram.
 - Windows
 - Python 3.12 (`python3.12`; do not use a Microsoft Store `python` alias)
 - [uv](https://docs.astral.sh/uv/) 0.12 or later
-- A B-AI API key in the environment (`ST_AGENT_API_KEY`)
+- A model API key in the environment (`ST_AGENT_API_KEY`)
 
 ## Setup
 
@@ -53,14 +53,14 @@ Copy `.env.example` to `.env` for local defaults. `.env` is gitignored. Developm
 
 | Variable | Purpose |
 | --- | --- |
-| `ST_AGENT_PROVIDER` | Development model provider. Default: `B-AI`. |
+| `ST_AGENT_PROVIDER` | Development model provider. Default: `B-AI`. Current live: `Alibaba-Token` via local env. |
 | `ST_AGENT_BASE_URL` | OpenAI-compatible API base URL. Default: `https://api.b.ai/v1`. |
-| `ST_AGENT_MODEL_ID` | Preferred model ID. Default: `hy3`. Authorized chain: `hy3`, `mimo-v2.5`, `glm-5.3-flash`, `qwen3.8-flash`. Runtime tries that list in order until one call succeeds. |
-| `ST_AGENT_API_KEY` | B-AI API key. Local env only; never commit. |
+| `ST_AGENT_MODEL_ID` | Preferred model ID. Authorized chain (this package): `deepseek-v4-flash-0731` only. |
+| `ST_AGENT_API_KEY` | Model API key. Local env only; never commit. |
 
 Do not commit `.env`, API keys, or session tokens. Do not put secrets in case files, logs, or generated artifacts.
 
-Story text and uploads are sent to B-AI. Keep that dependency explicit.
+Story text and uploads are sent to the configured model provider. Keep that dependency explicit.
 
 ## Supported inputs
 
@@ -96,7 +96,7 @@ Limits: 10 files, 2 MiB per text file, 20 MiB per image, 16 megapixels, 50 MiB t
 - Local single-user Windows demo. No accounts, no multi-case cloud memory, no AgentCore deployment in this package.
 - American English product and generated text. CJK in product files is out of scope.
 - PNG delivery requires a user-provided portrait. The app does not invent an image.
-- One live model invocation is bounded (about 90 seconds and a small turn budget). Long jobs continue with Resume / another Send. Default `hy3` may spend that budget on canonical-document repair and B-AI Chat Completions `reasoningContent` warnings; authorized fallback only starts if the first model fails before the budget ends.
+- One live model invocation is bounded (about 90 seconds per authorized model). This package authorizes only `deepseek-v4-flash-0731`. Long jobs continue with Resume / another Send.
 - Official format checks use a small allowlisted URL set. A source change blocks delivery until the local profile is updated.
 - Ordinary user cases are not imported into SillyTavern as a project gate. Frozen golden fixtures in `tests/fixtures/golden` are the project-level format suite.
 
@@ -110,7 +110,7 @@ The shell starts a local Streamlit page.
 
 1. Choose a workspace folder that is not inside this repository.
 2. **New**: enter a story name. Optionally check modify-mode if you will upload an existing card.
-3. **Send** a message (and optional files). Story text goes to B-AI. Watch sanitized tool events (`tool-start` / `tool-success` / `tool-failure`).
+3. **Send** a message (and optional files). Story text goes to the configured model. Watch sanitized tool events (`tool-start` / `tool-success` / `tool-failure`).
 4. Answer one question when the case is waiting, or **Resume** after an interruption.
 5. When delivery is gated and the case closes, download files listed under Deliverables.
 6. **Abandon** drops the case without claiming success. **New modification** starts a follow-up case from a delivered card.
@@ -127,7 +127,7 @@ uv run pytest
 uv run ruff check src tests app.py
 ```
 
-Live B-AI smoke (`tests/test_wp06_smoke.py`) skips when `ST_AGENT_API_KEY` is absent.
+Live model smoke (`tests/test_wp06_smoke.py`) skips when `ST_AGENT_API_KEY` is absent.
 
 ## Engineering baseline
 

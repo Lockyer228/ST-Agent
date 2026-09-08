@@ -20,6 +20,4 @@ The WP-01 README covered purpose, setup, and test commands. It did not name the 
 
 ## Live-run method
 
-## Live-run method
-
-The representative case is driven by `docs/spikes/wp-09-run-case.py` against a temp workspace outside the source tree (the app rejects workspaces inside application source). That uses the same `create_case` / `submit_turn` path as Streamlit Send. Live B-AI delivery of PNG + both lorebooks did not complete; timed attempts and tool events are in `wp-09-case-run.md`. G-07 records a fresh `uv sync --group dev` and Streamlit HTTP 200 on the Windows host.
+The representative case is driven by `docs/spikes/wp-09-run-case.py` against a temp workspace outside the source tree (the app rejects workspaces inside application source). That uses the same `create_case` / `submit_turn` path as Streamlit Send. Live B-AI produced PNG + both lorebooks on 2026-09-08 Attempt E (356.1s). Alibaba-Token `deepseek-v4-flash-0731` later delivered the same set in 83.5s (`wp-09-run-deepseek-nfr.json`). G-07 also records a fresh `uv sync --group dev` and Streamlit HTTP 200 on the Windows host.

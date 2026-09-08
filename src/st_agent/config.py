@@ -10,8 +10,8 @@ from st_agent.paths import source_root
 
 DEFAULT_PROVIDER = "B-AI"
 DEFAULT_BASE_URL = "https://api.b.ai/v1"
-DEFAULT_MODEL_ID = "hy3"
-AUTHORIZED_MODELS = ("hy3", "mimo-v2.5", "glm-5.3-flash", "qwen3.8-flash")
+DEFAULT_MODEL_ID = "deepseek-v4-flash-0731"
+AUTHORIZED_MODELS = ("deepseek-v4-flash-0731",)
 _COLLAB_ENV = Path("project") / "Collaboration" / "b-ai-development-provider.env"
 
 

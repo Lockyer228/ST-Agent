@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import uuid
@@ -132,6 +133,12 @@ def atomic_write(path: Path, data: str | bytes, encoding: str = "utf-8") -> None
     with tmp.open("r+b") as handle:
         handle.flush()
         os.fsync(handle.fileno())
+    if path.exists() and path.name == "case.json":
+        bak = path.with_name(path.name + ".bak")
+        bak.write_bytes(path.read_bytes())
+        with bak.open("r+b") as handle:
+            handle.flush()
+            os.fsync(handle.fileno())
     tmp.replace(path)
 
 
@@ -233,6 +240,28 @@ def create_case(
     return case_root
 
 
+def _parse_manifest_text(text: str) -> CaseManifest:
+    try:
+        return CaseManifest.model_validate_json(text)
+    except ValueError:
+        data, _end = json.JSONDecoder().raw_decode(text.lstrip())
+        return CaseManifest.model_validate(data)
+
+
+def _read_manifest_file(path: Path) -> tuple[CaseManifest, bool]:
+    text = path.read_text(encoding="utf-8")
+    try:
+        return CaseManifest.model_validate_json(text), False
+    except (UnicodeDecodeError, ValueError):
+        try:
+            return _parse_manifest_text(text), True
+        except (UnicodeDecodeError, ValueError, TypeError):
+            bak = path.with_name(path.name + ".bak")
+            if bak.is_file():
+                return _parse_manifest_text(bak.read_text(encoding="utf-8")), True
+            raise
+
+
 def load_manifest(case_root: Path) -> CaseManifest:
     path = case_root / WORK_DIR / "case.json"
     if not path.is_file():
@@ -246,9 +275,12 @@ def load_manifest(case_root: Path) -> CaseManifest:
                 raise ClosedCaseError("closed case cannot restore Q&A")
         raise ClosedCaseError("no active case manifest")
     try:
-        return CaseManifest.model_validate_json(path.read_text(encoding="utf-8"))
-    except (UnicodeDecodeError, ValueError) as exc:
+        manifest, dirty = _read_manifest_file(path)
+    except (UnicodeDecodeError, ValueError, TypeError, OSError) as exc:
         raise WorkspaceError("case manifest is unreadable") from exc
+    if dirty:
+        atomic_write(path, manifest.model_dump_json(indent=2))
+    return manifest
 
 
 def save_manifest(
@@ -258,7 +290,7 @@ def save_manifest(
     operation_id: str | None = None,
 ) -> CaseManifest:
     path = contained_path(case_root, WORK_DIR, "case.json")
-    current = CaseManifest.model_validate_json(path.read_text(encoding="utf-8"))
+    current, _dirty = _read_manifest_file(path)
     if operation_id and current.operation_id == operation_id:
         return current
     updated = manifest.model_copy(

@@ -1,0 +1,45 @@
+{
+  "provider": "Alibaba-Token",
+  "base_url": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+  "preferred_model": "deepseek-v4-flash-0731",
+  "key_present": true,
+  "live_timeout_s": 180.0,
+  "turns": [
+    {
+      "n": 1,
+      "kind": "blocked",
+      "blocker": "b-ai-models-unavailable",
+      "required_input": null,
+      "question": "",
+      "message": "ValueError",
+      "artifact_refs": [],
+      "events": [
+        "tool-start:save_brief",
+        "tool-start:check_official_sources",
+        "tool-start:save_content_document",
+        "tool-failure:check_official_sources:invalid-phase",
+        "tool-success:save_content_document",
+        "tool-success:save_brief",
+        "tool-start:save_content_document",
+        "tool-failure:save_content_document:canonical-invalid",
+        "invocation-complete"
+      ]
+    }
+  ],
+  "elapsed_s": 180.6,
+  "result": "blocked",
+  "exports": [],
+  "events": [
+    "tool-start:save_brief",
+    "tool-start:check_official_sources",
+    "tool-start:save_content_document",
+    "tool-failure:check_official_sources:invalid-phase",
+    "tool-success:save_content_document",
+    "tool-success:save_brief",
+    "tool-start:save_content_document",
+    "tool-failure:save_content_document:canonical-invalid",
+    "invocation-complete"
+  ],
+  "blocker": "b-ai-models-unavailable",
+  "story": "wp-09-case-input.md"
+}

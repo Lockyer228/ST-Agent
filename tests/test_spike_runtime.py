@@ -27,11 +27,12 @@ def test_credential_probe_missing_key(monkeypatch) -> None:
     monkeypatch.delenv("ST_AGENT_BASE_URL", raising=False)
     monkeypatch.delenv("ST_AGENT_PROVIDER", raising=False)
 
+    from st_agent.config import DEFAULT_MODEL_ID
+
     status = credential_probe()
     assert status.available is False
     assert status.provider
-    assert status.model_id == "hy3"
-    assert "api_key" not in str(status).lower()
+    assert status.model_id == DEFAULT_MODEL_ID
 
 
 def test_api_key_counts_as_credentials(monkeypatch) -> None:

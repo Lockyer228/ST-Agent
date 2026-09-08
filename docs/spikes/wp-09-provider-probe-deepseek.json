@@ -1,0 +1,38 @@
+{
+  "provider": "Alibaba-Token",
+  "base_url": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+  "key_present": true,
+  "timeout_s": 45.0,
+  "models": [
+    {
+      "model_id": "deepseek-v4-flash-0731",
+      "status": "pass",
+      "stop_reason": "tool_use",
+      "events": [
+        "tool-start:ping_alpha",
+        "tool-end:ping_alpha",
+        "tool-start:ping_beta",
+        "tool-end:ping_beta",
+        "tool-start:TurnOutcome",
+        "tool-end:TurnOutcome"
+      ],
+      "kind": "blocked",
+      "message": "Called ping_alpha (note=one) which returned \"alpha:one\", and ping_beta (note=two) which returned \"beta:two\". Both tool calls were made but delivery is not claimed.",
+      "elapsed_s": 8.862,
+      "input_tokens": 2321,
+      "output_tokens": 523,
+      "tool_use_emitted": true,
+      "multi_tool_loop": true,
+      "reasoning_content_warnings": [
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API."
+      ],
+      "other_warnings": []
+    }
+  ],
+  "verdict": "not-provider-limited",
+  "reliable_models": [
+    "deepseek-v4-flash-0731"
+  ]
+}

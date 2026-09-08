@@ -20,11 +20,13 @@ Recorded for the release-candidate package. Fill run timing in `wp-09-run-log.js
 
 | Item | Value |
 | --- | --- |
-| Provider | B-AI |
-| Base URL | `https://api.b.ai/v1` |
-| Preferred model | `hy3` (`ST_AGENT_MODEL_ID`) |
-| Authorized fallback chain | `hy3` → `mimo-v2.5` → `glm-5.3-flash` → `qwen3.8-flash` |
-| Live turn bound | `LIVE_TIMEOUT_S = 90` per `submit_turn`; provider retries = 1 |
+| Provider | `Alibaba-Token` (OpenAI-compatible; env) |
+| Base URL | `ST_AGENT_BASE_URL` (live: Alibaba Token Plan compatible-mode) |
+| Preferred model | `deepseek-v4-flash-0731` (`ST_AGENT_MODEL_ID`) |
+| Authorized fallback chain | `deepseek-v4-flash-0731` only (user 2026-09-08) |
+| Live turn bound | `LIVE_TIMEOUT_S = 90` **per authorized model**; provider retries = 1 |
+| Thinking | `extra_body.enable_thinking = false` on the OpenAI Chat Completions client |
+| Representative driver | first Send 25s (`ST_AGENT_FIRST_TURN_S`); later Sends 90s |
 
 API keys stay in the environment. They are not recorded here.
 

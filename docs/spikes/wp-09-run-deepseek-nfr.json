@@ -1,0 +1,94 @@
+{
+  "provider": "Alibaba-Token",
+  "base_url": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+  "preferred_model": "deepseek-v4-flash-0731",
+  "key_present": true,
+  "live_timeout_s": 90.0,
+  "first_turn_timeout_s": 25.0,
+  "turns": [
+    {
+      "n": 1,
+      "kind": "blocked",
+      "blocker": "live-timeout",
+      "required_input": null,
+      "question": "",
+      "message": "The live turn reached the time budget. Saved files are kept; send again to continue.",
+      "artifact_refs": [],
+      "events": [
+        "invocation-complete"
+      ]
+    },
+    {
+      "n": 2,
+      "kind": "delivered",
+      "blocker": null,
+      "required_input": null,
+      "question": "",
+      "message": "Case delivered. Canonical Markdown saved, and all requested deliverables were built and validated: the Mara Ellison character card (JSON), the Reedwick channel notes lorebook (standalone, also embedded in the card), and the PNG card using the uploaded jetty lamp portrait. One transient file lock on the character card build was resolved by retrying.",
+      "artifact_refs": [
+        "04-exports/character-cards/card.json",
+        "04-exports/lorebooks/lorebook.json",
+        "04-exports/png-cards/card.png"
+      ],
+      "events": [
+        "tool-start:save_brief",
+        "tool-success:save_brief",
+        "tool-start:save_content_document",
+        "tool-success:save_content_document",
+        "tool-start:build_character_card",
+        "tool-start:build_lorebook",
+        "tool-start:build_png_card",
+        "tool-failure:build_png_card:missing-card",
+        "tool-failure:build_character_card",
+        "tool-success:build_lorebook",
+        "tool-start:build_character_card",
+        "tool-success:build_character_card",
+        "tool-start:build_png_card",
+        "tool-success:build_png_card",
+        "tool-start:check_official_sources",
+        "tool-success:check_official_sources",
+        "tool-start:validate_deliverables",
+        "tool-success:validate_deliverables",
+        "tool-start:finish_case",
+        "tool-success:finish_case",
+        "tool-start:TurnOutcome",
+        "tool-success:TurnOutcome",
+        "invocation-complete"
+      ]
+    }
+  ],
+  "elapsed_s": 83.5,
+  "result": "delivered",
+  "exports": [
+    "04-exports/character-cards/card.json",
+    "04-exports/lorebooks/lorebook.json",
+    "04-exports/png-cards/card.png"
+  ],
+  "events": [
+    "invocation-complete",
+    "tool-start:save_brief",
+    "tool-success:save_brief",
+    "tool-start:save_content_document",
+    "tool-success:save_content_document",
+    "tool-start:build_character_card",
+    "tool-start:build_lorebook",
+    "tool-start:build_png_card",
+    "tool-failure:build_png_card:missing-card",
+    "tool-failure:build_character_card",
+    "tool-success:build_lorebook",
+    "tool-start:build_character_card",
+    "tool-success:build_character_card",
+    "tool-start:build_png_card",
+    "tool-success:build_png_card",
+    "tool-start:check_official_sources",
+    "tool-success:check_official_sources",
+    "tool-start:validate_deliverables",
+    "tool-success:validate_deliverables",
+    "tool-start:finish_case",
+    "tool-success:finish_case",
+    "tool-start:TurnOutcome",
+    "tool-success:TurnOutcome",
+    "invocation-complete"
+  ],
+  "story": "wp-09-case-input.md"
+}

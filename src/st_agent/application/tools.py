@@ -87,6 +87,7 @@ class ToolContext:
     finish_ok: bool = False
     source_service: OfficialSourceService | None = None
     seq: int = 0
+    canonical_invalid: int = 0
 
     def next_op(self, tool: str) -> str:
         self.seq += 1
@@ -314,10 +315,17 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
                 hashes={"draft": file_sha256(path)},
                 revision=load_manifest(case_root).revision,
             )
+        if ctx.canonical_invalid >= 3:
+            return envelope(
+                ok=False,
+                code="canonical-retry-limit",
+                message="canonical Markdown failed validation three times; stop retrying",
+            )
         try:
             text = roundtrip(parse_canonical(markdown))
             rendered = render_canonical(text)
         except CanonicalError as exc:
+            ctx.canonical_invalid += 1
             return envelope(
                 ok=False,
                 code="canonical-invalid",

@@ -1,0 +1,118 @@
+{
+  "provider": "B-AI",
+  "base_url": "https://api.b.ai/v1",
+  "key_present": true,
+  "timeout_s": 45.0,
+  "models": [
+    {
+      "model_id": "hy3",
+      "status": "pass",
+      "stop_reason": "tool_use",
+      "events": [
+        "tool-start:ping_alpha",
+        "tool-end:ping_alpha",
+        "tool-start:ping_beta",
+        "tool-end:ping_beta",
+        "tool-start:TurnOutcome",
+        "tool-end:TurnOutcome"
+      ],
+      "kind": "blocked",
+      "message": "The multi-tool loop completed: ping_alpha returned \"alpha:one\" and ping_beta returned \"beta:two\". This turn is blocked and does not constitute delivery.",
+      "elapsed_s": 11.907,
+      "input_tokens": 1785,
+      "output_tokens": 324,
+      "tool_use_emitted": true,
+      "multi_tool_loop": true,
+      "reasoning_content_warnings": [
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API."
+      ],
+      "other_warnings": []
+    },
+    {
+      "model_id": "mimo-v2.5",
+      "status": "error",
+      "error_type": "EventLoopException",
+      "error": "Upstream request failed",
+      "events": [
+        "tool-start:ping_alpha",
+        "tool-end:ping_alpha",
+        "tool-start:ping_beta",
+        "tool-end:ping_beta"
+      ],
+      "elapsed_s": 15.765,
+      "tool_use_emitted": true,
+      "multi_tool_loop": false,
+      "reasoning_content_warnings": [
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API."
+      ],
+      "other_warnings": [
+        "ERROR:exception=<APIError> | event loop cycle failed"
+      ]
+    },
+    {
+      "model_id": "glm-5.3-flash",
+      "status": "pass",
+      "stop_reason": "tool_use",
+      "events": [
+        "tool-start:ping_alpha",
+        "tool-start:ping_beta",
+        "tool-end:ping_alpha",
+        "tool-end:ping_beta",
+        "tool-start:TurnOutcome",
+        "tool-end:TurnOutcome"
+      ],
+      "kind": "blocked",
+      "message": "Multi-tool loop executed. ping_alpha returned: \"alpha:one\". ping_beta returned: \"beta:two\". Both tool results are named here as instructed; delivery is not claimed.",
+      "elapsed_s": 24.884,
+      "input_tokens": 1030,
+      "output_tokens": 717,
+      "tool_use_emitted": true,
+      "multi_tool_loop": true,
+      "reasoning_content_warnings": [
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API."
+      ],
+      "other_warnings": []
+    },
+    {
+      "model_id": "qwen3.8-flash",
+      "status": "pass",
+      "stop_reason": "tool_use",
+      "events": [
+        "tool-start:ping_alpha",
+        "tool-end:ping_alpha",
+        "tool-start:ping_beta",
+        "tool-end:ping_beta",
+        "tool-start:TurnOutcome",
+        "tool-end:TurnOutcome",
+        "tool-start:TurnOutcome",
+        "tool-end:TurnOutcome"
+      ],
+      "kind": "blocked",
+      "message": "Multi-tool loop executed: ping_alpha returned \"alpha:one\" and ping_beta returned \"beta:two\". No deliverable artifact was produced from these results, so this turn is reported as blocked rather than delivered.",
+      "elapsed_s": 17.456,
+      "input_tokens": 3099,
+      "output_tokens": 565,
+      "tool_use_emitted": true,
+      "multi_tool_loop": true,
+      "reasoning_content_warnings": [
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API.",
+        "WARNING:reasoningContent is not supported in multi-turn conversations with the Chat Completions API."
+      ],
+      "other_warnings": []
+    }
+  ],
+  "verdict": "not-provider-limited",
+  "reliable_models": [
+    "hy3",
+    "glm-5.3-flash",
+    "qwen3.8-flash"
+  ]
+}

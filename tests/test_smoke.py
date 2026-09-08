@@ -34,7 +34,7 @@ def test_settings_use_documented_defaults(monkeypatch) -> None:
     from st_agent.config import DEFAULT_BASE_URL, DEFAULT_MODEL_ID, DEFAULT_PROVIDER, load_settings
 
     settings = load_settings()
-    assert settings.model_id == DEFAULT_MODEL_ID == "hy3"
+    assert settings.model_id == DEFAULT_MODEL_ID == "deepseek-v4-flash-0731"
     assert settings.provider == DEFAULT_PROVIDER
     assert settings.base_url == DEFAULT_BASE_URL
 
@@ -42,9 +42,8 @@ def test_settings_use_documented_defaults(monkeypatch) -> None:
 def test_authorized_model_chain_starts_with_preferred() -> None:
     from st_agent.config import AUTHORIZED_MODELS, authorized_model_chain
 
-    assert AUTHORIZED_MODELS == ("hy3", "mimo-v2.5", "glm-5.3-flash", "qwen3.8-flash")
-    assert authorized_model_chain("glm-5.3-flash")[0] == "glm-5.3-flash"
-    assert set(authorized_model_chain("glm-5.3-flash")) == set(AUTHORIZED_MODELS)
+    assert AUTHORIZED_MODELS == ("deepseek-v4-flash-0731",)
+    assert authorized_model_chain("deepseek-v4-flash-0731") == AUTHORIZED_MODELS
     assert authorized_model_chain("unknown") == AUTHORIZED_MODELS
 
 

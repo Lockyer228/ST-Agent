@@ -1,0 +1,28 @@
+{
+  "provider": "Alibaba-Token",
+  "base_url": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+  "preferred_model": "deepseek-v4-flash-0731",
+  "key_present": true,
+  "turns": [
+    {
+      "n": 1,
+      "kind": "blocked",
+      "blocker": "b-ai-models-unavailable",
+      "required_input": null,
+      "question": "",
+      "message": "ValueError",
+      "artifact_refs": [],
+      "events": [
+        "invocation-complete"
+      ]
+    }
+  ],
+  "elapsed_s": 90.6,
+  "result": "blocked",
+  "exports": [],
+  "events": [
+    "invocation-complete"
+  ],
+  "blocker": "b-ai-models-unavailable",
+  "story": "wp-09-case-input.md"
+}

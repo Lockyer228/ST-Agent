@@ -15,6 +15,9 @@ _BLOCKER_HELP = {
         "B-AI credentials are missing. Set ST_AGENT_API_KEY in the environment and retry."
     ),
     "b-ai-models-unavailable": "The model provider is unavailable. Wait a moment and retry.",
+    "live-timeout": (
+        "The live turn hit the time budget. Saved files were kept. Send again to continue."
+    ),
     "ungated-delivery": "Delivery was not accepted. Continue until finish_case passes the gate.",
     "case-closed": "This case is closed. Start a new case or open a modification.",
     "case-locked": "This case is busy. Wait and retry.",

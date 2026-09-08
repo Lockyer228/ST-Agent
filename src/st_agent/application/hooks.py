@@ -15,6 +15,44 @@ def _tool_name(event: BeforeToolCallEvent | AfterToolCallEvent) -> str:
     return "unknown"
 
 
+def _envelope_code(result: object) -> str | None:
+    if result is None:
+        return None
+    nested = getattr(result, "tool_result", None)
+    if nested is not None and nested is not result:
+        return _envelope_code(nested)
+    if not isinstance(result, dict):
+        return None
+    inner = result.get("tool_result")
+    if isinstance(inner, dict):
+        code = _envelope_code(inner)
+        if code:
+            return code
+    code = result.get("code")
+    if result.get("ok") is False and isinstance(code, str) and code:
+        return code
+    for block in result.get("content") or []:
+        if not isinstance(block, dict):
+            continue
+        payload = block.get("json")
+        if isinstance(payload, dict) and payload.get("ok") is False:
+            inner_code = payload.get("code")
+            if isinstance(inner_code, str) and inner_code:
+                return inner_code
+        text = block.get("text")
+        if not isinstance(text, str):
+            continue
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict) and parsed.get("ok") is False:
+            inner_code = parsed.get("code")
+            if isinstance(inner_code, str) and inner_code:
+                return inner_code
+    return None
+
+
 def _tool_failed(result: object) -> bool:
     if result is None:
         return False
@@ -60,7 +98,12 @@ class SanitizedHooks:
         if name not in TOOL_NAMES and name != "TurnOutcome":
             return
         failed = event.exception is not None or _tool_failed(event.result)
-        self.events.append(f"tool-failure:{name}" if failed else f"tool-success:{name}")
+        if failed:
+            code = _envelope_code(event.result)
+            suffix = f":{code}" if code else ""
+            self.events.append(f"tool-failure:{name}{suffix}")
+        else:
+            self.events.append(f"tool-success:{name}")
 
     def after_invocation(self, event: AfterInvocationEvent) -> None:
         self.events.append("invocation-complete")

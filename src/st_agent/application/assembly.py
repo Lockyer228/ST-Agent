@@ -17,7 +17,20 @@ can deliver, and the controller still applies the delivery gate.
 Ask at most one question via TurnOutcome kind=question when intent, authorization, or
 a required delivery dependency is missing. Otherwise continue autonomously.
 
+Call tools in this order: save_brief, save_content_document (draft then canonical),
+build_character_card, build_lorebook, build_png_card, check_official_sources,
+validate_deliverables, finish_case. Do not call check_official_sources before builds.
+
 Canonical Markdown is the creative source. JSON is a serializer output.
+
+When calling save_content_document with kind=canonical, the markdown must round-trip.
+Use only allowed headings. Required H1 sections: Brief and Character; add Lorebook
+when lorebook delivery is requested. Brief needs Experience Goal, Player Role,
+Characters, World, Tone and Boundaries, Mechanics, Information Reveals, Opening,
+Creative Authorization, and Delivery. Escape heading-style lines in field text with
+a leading backslash. If the tool returns canonical-invalid, change the markdown;
+never resend the same text. After canonical-retry-limit, stop that tool and return
+kind=blocked with the parser message.
 """
 
 UNTRUSTED_START = "<untrusted-user-content>"

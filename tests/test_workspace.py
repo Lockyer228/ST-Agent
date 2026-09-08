@@ -305,6 +305,27 @@ def test_load_manifest_wraps_invalid_json(tmp_path: Path) -> None:
         load_manifest(case_root)
 
 
+def test_load_manifest_recovers_trailing_bytes(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    path = case_root / "00-work" / "case.json"
+    good = path.read_text(encoding="utf-8")
+    path.write_text(good + "\nthis-is-trailing-garbage", encoding="utf-8")
+    manifest = load_manifest(case_root)
+    assert manifest.story_name == "harbor-watch"
+    healed = path.read_text(encoding="utf-8")
+    assert "trailing-garbage" not in healed
+
+
+def test_load_manifest_recovers_from_bak(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    path = case_root / "00-work" / "case.json"
+    bak = path.with_name("case.json.bak")
+    bak.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    path.write_text("{not-json", encoding="utf-8")
+    manifest = load_manifest(case_root)
+    assert manifest.story_name == "harbor-watch"
+
+
 def test_load_manifest_wraps_non_utf8_readme(tmp_path: Path) -> None:
     case_root = create_case(tmp_path, "harbor-watch")
     shutil.rmtree(case_root / "00-work")

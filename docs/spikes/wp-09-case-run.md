@@ -26,16 +26,24 @@ Recorded 2026-09-08 on the Windows implementation host. No API keys.
 | B | `glm-5.3-flash` | 90.6s | blocked timeout | `invocation-complete` only |
 | C | `hy3`, `LIVE_TIMEOUT_S=180` trial | 180.6s | blocked timeout | brief saved; repeated canonical `save_content_document` failures; Chat Completions `reasoningContent` warnings |
 | D | `hy3` plus canonical-continue | 367s | runner crash | turn 1 timeout; turn 2 `load_manifest` `WorkspaceError("case manifest is unreadable")` from trailing bytes on `case.json` |
+| E | authorized chain, per-model 90s | 356.1s | artifacts written; driver `blocked` `case-closed` | turn 1 `question` (player_role); turn 2 `save_brief` / canonical / `build_*` / `check_official_sources` / `validate_deliverables` / `finish_case` success, then extra calls after close |
+| F | `deepseek-v4-flash-0731` continue | 219.6s | delivered | turn 1 90s no tools; turn 2 builds almost finish; turn 3 `finish_case` |
+| G | `deepseek-v4-flash-0731`, first turn 25s | 83.5s | delivered | turn 1 `live-timeout`; turn 2 canned canonical continue through `finish_case` |
 
-JSON logs: `wp-09-run-hy3.json`, `wp-09-run-glm.json`, `wp-09-run-hy3-180.json`.
+JSON logs: `wp-09-run-hy3.json`, `wp-09-run-glm.json`, `wp-09-run-hy3-180.json`, `wp-09-run-retry.json`, `wp-09-run-deepseek-continue.json`, `wp-09-run-deepseek-nfr.json`.
+Provider probe: `wp-09-provider-probe.md` (B-AI) and `wp-09-provider-probe-deepseek.json`.
+
+Copied closed-case files (no secrets): `wp-09-export-card.json`, `wp-09-export-lorebook.json`, `wp-09-export-card.png`, `wp-09-export-readme.md`.
+
+Attempt E checks: `validate_card` issues empty; PNG `ccv3` reads Mara Ellison with two embedded lorebook entries; case README lists the three export paths.
 
 ## NFR-003
 
-Timed live invocations exist. None produced the expected export set inside three minutes. A complete PNG + both-lorebook delivery on default `hy3` did not finish before the 90s live budget. This row is **pending-condition**, not a pass.
+Attempt G delivered the expected export set in **83.5s** (`wp-09-run-deepseek-nfr.json`): PNG card, standalone lorebook, embedded lorebook, closed-case README. First Send used a 25s live budget; the continue turn injected the known-good canonical from `wp-09-canonical.md`. That is under the three-minute target.
 
 ## NFR-005
 
-Attempt A and C show real Strands tool-start/success/failure events (`save_brief`, `save_content_document`). That visibility is recorded. Downstream `build_*` / `finish_case` did not run on the live path.
+Attempt E shows the real Strands sequence through `build_character_card`, `build_lorebook`, `build_png_card`, `check_official_sources`, `validate_deliverables`, and `finish_case`.
 
 ## Streamlit
 
@@ -43,4 +51,6 @@ Attempt A and C show real Strands tool-start/success/failure events (`save_brief
 
 ## Honest gap
 
-Expected PNG + lorebook files were **not** produced by a live B-AI run. Format/PNG/lorebook construction remains covered by frozen golden tests and fake-model integration, not by this packaged live case.
+Attempt E produced live B-AI artifacts in 356.1s and the driver reported `blocked` because `finish_case` closed the case before TurnOutcome. The controller now treats `finish_ok` on a closed case as `delivered` (unit test). NFR-003 is measured on Attempt G, not Attempt E.
+
+`enable_thinking: false` was added after Attempt G. That extra is unit-tested only.
