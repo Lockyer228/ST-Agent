@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -68,6 +69,66 @@ def test_system_prompt_requires_canonical_roundtrip() -> None:
     assert "canonical-invalid" in SYSTEM_PROMPT
     assert "# Brief" in SYSTEM_PROMPT or "Brief" in SYSTEM_PROMPT
     assert "round-trip" in SYSTEM_PROMPT
+    assert "save_brief" in SYSTEM_PROMPT
+    assert "build_character_card" in SYSTEM_PROMPT
+    assert "check_official_sources" in SYSTEM_PROMPT
+    assert "validate_deliverables" in SYSTEM_PROMPT
+    assert "finish_case" in SYSTEM_PROMPT
+
+
+def test_save_brief_writes_importable_canonical(tmp_path: Path) -> None:
+    from st_agent.services.serializers import serialize_character
+    from st_agent.services.validators import validate_card
+
+    case_root = create_case(tmp_path, "harbor-watch")
+    ctx = ToolContext(case_root=case_root, invocation_id="inv-brief", operation_id="op-brief")
+    tools = {item.tool_name: item._tool_func for item in bind_tools(ctx)}
+    args = {**BRIEF_ARGS, "lorebook_output": "both"}
+    assert tools["save_brief"](**args)["ok"] is True
+    doc = load_creative_path(case_root / "03-final-text" / "canonical.md")
+    assert doc.character is not None
+    assert doc.character.name.strip()
+    assert doc.lorebook is not None
+    assert doc.lorebook.entries
+    card = serialize_character(doc.character, lorebook=doc.lorebook)
+    assert validate_card(card).ok
+    built = tools["build_character_card"]()
+    assert built["ok"] is True
+    payload = json.loads((case_root / "04-exports" / "character-cards" / "card.json").read_text())
+    assert payload["data"]["name"].strip()
+
+
+def test_brief_then_builds_can_finish(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    ctx = ToolContext(
+        case_root=case_root,
+        invocation_id="inv-finish",
+        operation_id="op-finish",
+        source_service=_source_service(),
+    )
+    tools = {item.tool_name: item._tool_func for item in bind_tools(ctx)}
+    args = {**BRIEF_ARGS, "lorebook_output": "both"}
+    assert tools["save_brief"](**args)["ok"] is True
+    assert tools["build_character_card"]()["ok"] is True
+    lore = tools["build_lorebook"]()
+    assert lore["ok"] is True
+    assert tools["check_official_sources"]()["ok"] is True
+    assert tools["validate_deliverables"]()["ok"] is True
+    done = tools["finish_case"]()
+    assert done["ok"] is True
+
+
+def test_invalid_canonical_save_keeps_auto_file(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    ctx = ToolContext(case_root=case_root, invocation_id="inv-keep", operation_id="op-keep")
+    tools = {item.tool_name: item._tool_func for item in bind_tools(ctx)}
+    assert tools["save_brief"](**BRIEF_ARGS)["ok"] is True
+    path = case_root / "03-final-text" / "canonical.md"
+    before = path.read_text(encoding="utf-8")
+    result = tools["save_content_document"](kind="canonical", markdown="# Notes\nNot canonical.\n")
+    assert result["ok"] is False
+    assert result["code"] == "canonical-invalid"
+    assert path.read_text(encoding="utf-8") == before
 
 
 def test_canonical_save_stops_after_three_invalid(tmp_path: Path) -> None:

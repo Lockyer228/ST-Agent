@@ -281,3 +281,94 @@ def load_creative_path(path: Path) -> CanonicalDocument:
     if path.suffix.lower() == ".json":
         raise CanonicalError("JSON is not the creative source")
     return roundtrip(parse_canonical(path.read_text(encoding="utf-8")))
+
+
+def _slug(text: str, fallback: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", text.strip().lower()).strip("-")
+    return slug[:48] or fallback
+
+
+def _name_from_characters(characters: str) -> str:
+    text = (characters or "").strip()
+    if not text:
+        return "Character"
+    line = text.splitlines()[0].strip()
+    for sep in ("：", ":"):
+        if sep in line:
+            left, right = (part.strip() for part in line.split(sep, 1))
+            line = right if len(left) <= 4 else left
+            break
+    clause = re.split(r"[.。;；!！?？]", line, maxsplit=1)[0]
+    clause = re.split(r"[,，]", clause, maxsplit=1)[0].strip()
+    taken: list[str] = []
+    for word in clause.split():
+        token = word.strip("\"'")
+        if token and token[:1].isupper():
+            taken.append(token)
+        else:
+            break
+    name = " ".join(taken) if taken else clause
+    return name[:80].strip() or "Character"
+
+
+def _keys(text: str, fallback: str) -> list[str]:
+    cleaned = text.replace(",", " ").replace("，", " ")
+    keys: list[str] = []
+    for word in cleaned.split():
+        token = word.strip(".,;:。")[:40]
+        if len(token) < 2 or "," in token or token in keys:
+            continue
+        keys.append(token)
+        if len(keys) >= 3:
+            break
+    if keys:
+        return keys
+    token = (cleaned.strip()[:20] or fallback).replace(",", " ").strip()
+    return [token or fallback]
+
+
+def _brief_entry(text: str, fallback_id: str, title: str) -> LorebookEntry | None:
+    content = (text or "").strip()
+    if not content:
+        return None
+    return LorebookEntry(
+        entry_id=_slug(title, fallback_id),
+        title=title,
+        content=content,
+        keys=_keys(content, fallback_id),
+        selective=True,
+        enabled=True,
+    )
+
+
+def document_from_brief(brief: CaseBrief) -> CanonicalDocument:
+    character = CharacterContent(
+        name=_name_from_characters(brief.characters),
+        description=brief.characters,
+        personality=brief.tone_and_boundaries,
+        scenario="\n".join(part for part in (brief.player_role, brief.world) if part.strip()),
+        first_message=brief.opening,
+    )
+    lorebook = None
+    if brief.delivery.lorebook is not LorebookDelivery.none:
+        entries = [
+            item
+            for item in (
+                _brief_entry(brief.world, "world", "World"),
+                _brief_entry(brief.information_reveals, "reveal", "Reveal"),
+            )
+            if item is not None
+        ]
+        if not entries:
+            fallback = _brief_entry(brief.experience_goal, "world", "World")
+            entries = [fallback] if fallback is not None else []
+        seen: set[str] = set()
+        for entry in entries:
+            if entry.entry_id in seen:
+                entry.entry_id = f"{entry.entry_id}-2"
+            seen.add(entry.entry_id)
+        lorebook = LorebookContent(
+            name=(brief.world.strip().splitlines()[0][:60] if brief.world.strip() else "Lorebook"),
+            entries=entries,
+        )
+    return CanonicalDocument(brief=brief, character=character, lorebook=lorebook)

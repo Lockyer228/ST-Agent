@@ -11,10 +11,16 @@ from PIL import Image
 from strands import tool
 
 from st_agent.application.envelope import envelope
-from st_agent.application.lifecycle import InvalidTransition, advance_phase, rewind_phase
+from st_agent.application.lifecycle import (
+    PHASE_ORDER,
+    InvalidTransition,
+    advance_phase,
+    rewind_phase,
+)
 from st_agent.domain.canonical import (
     CanonicalDocument,
     CanonicalError,
+    document_from_brief,
     parse_canonical,
     render_canonical,
     roundtrip,
@@ -102,7 +108,7 @@ CANONICAL_PHASES = {
     Phase.official_check,
     Phase.validate,
 }
-BUILD_PHASES = {Phase.final_text, Phase.build, Phase.official_check, Phase.validate}
+BUILD_PHASES = {Phase.draft, Phase.final_text, Phase.build, Phase.official_check, Phase.validate}
 SOURCE_PHASES = {Phase.build, Phase.official_check}
 VALIDATE_PHASES = {Phase.official_check, Phase.validate}
 
@@ -125,6 +131,8 @@ def _advance(
     manifest = load_manifest(case_root)
     for target in targets:
         if manifest.phase == target:
+            continue
+        if PHASE_ORDER.index(target) < PHASE_ORDER.index(manifest.phase):
             continue
         try:
             manifest = advance_phase(manifest, target)
@@ -272,6 +280,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
         )
         path = contained_path(case_root, WORK_DIR, "brief.md")
         atomic_write(path, _brief_markdown(brief))
+        canonical = _canonical_path(case_root)
+        auto = roundtrip(document_from_brief(brief))
+        atomic_write(canonical, render_canonical(auto))
         manifest, err = _advance(
             case_root, Phase.intake, Phase.draft, operation_id=ctx.next_op("save_brief")
         )
@@ -292,9 +303,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
         )
         return envelope(
             ok=True,
-            artifact_refs=["00-work/brief.md"],
+            artifact_refs=["00-work/brief.md", "03-final-text/canonical.md"],
             revision=manifest.revision,
-            hashes={"brief": file_sha256(path)},
+            hashes={"brief": file_sha256(path), "canonical": file_sha256(canonical)},
         )
 
     @tool
@@ -403,7 +414,10 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             )
         else:
             current, err = _advance(
-                case_root, Phase.build, operation_id=ctx.next_op("build_character_card")
+                case_root,
+                Phase.final_text,
+                Phase.build,
+                operation_id=ctx.next_op("build_character_card"),
             )
             if err:
                 return err
@@ -460,7 +474,7 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             )
         else:
             current, err = _advance(
-                case_root, Phase.build, operation_id=ctx.next_op("build_lorebook")
+                case_root, Phase.final_text, Phase.build, operation_id=ctx.next_op("build_lorebook")
             )
             if err:
                 return err
@@ -514,7 +528,7 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             )
         else:
             current, err = _advance(
-                case_root, Phase.build, operation_id=ctx.next_op("build_png_card")
+                case_root, Phase.final_text, Phase.build, operation_id=ctx.next_op("build_png_card")
             )
             if err:
                 return err

@@ -48,6 +48,9 @@ def validate_card(card: dict[str, Any]) -> ValidationResult:
     for name in profile["required_data_fields"]:
         if name not in data:
             issues.append(RepairableIssue("card-field", f"missing data.{name}", name))
+    name = data.get("name")
+    if isinstance(name, str) and not name.strip():
+        issues.append(RepairableIssue("card-name", "card name must not be blank", "name"))
     return _result(*issues)
 
 

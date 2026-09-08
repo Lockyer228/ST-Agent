@@ -73,6 +73,15 @@ def test_character_serializer_matches_ccv3_envelope() -> None:
     assert card["spec_version"] == "3.0"
     assert card["data"]["name"] == "Mira Vale"
     assert card["data"]["first_mes"] == "The lanterns hiss."
+    assert validate_card(card).ok
+
+
+def test_validate_card_rejects_blank_name() -> None:
+    card = serialize_character(_character())
+    card["data"]["name"] = ""
+    result = validate_card(card)
+    assert not result.ok
+    assert any(item.code == "card-name" for item in result.issues)
 
 
 def test_unsupported_position_is_rejected() -> None:

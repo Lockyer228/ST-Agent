@@ -9,11 +9,13 @@ import pytest
 from st_agent.domain.canonical import (
     CanonicalDocument,
     CanonicalError,
+    document_from_brief,
     load_creative_path,
     parse_canonical,
     render_canonical,
     roundtrip,
 )
+from st_agent.domain.case import LorebookDelivery
 from st_agent.domain.content import (
     CaseBrief,
     CharacterContent,
@@ -53,6 +55,25 @@ def _character() -> CharacterContent:
         tags=["tavern", "port"],
         lorebook_relationship="Uses the harbor ledger entries.",
     )
+
+
+def test_document_from_brief_fills_character_and_roundtrips() -> None:
+    doc = document_from_brief(_brief())
+    assert doc.character is not None
+    assert doc.character.name.strip()
+    assert "Mara" in doc.character.name
+    assert doc.lorebook is None
+    assert roundtrip(doc).model_dump() == doc.model_dump()
+
+
+def test_document_from_brief_adds_lorebook_when_requested() -> None:
+    brief = _brief().model_copy(
+        update={"delivery": DeliveryPreferences(lorebook=LorebookDelivery.both)}
+    )
+    doc = document_from_brief(brief)
+    assert doc.lorebook is not None
+    assert doc.lorebook.entries
+    assert roundtrip(doc).model_dump() == doc.model_dump()
 
 
 def test_character_roundtrip_is_semantic() -> None:
