@@ -9,7 +9,6 @@ import pytest
 
 from st_agent.application.assembly import SYSTEM_PROMPT
 from st_agent.application.case_controller import (
-    LIVE_TIMEOUT_S,
     _live_model,
     submit_turn,
     try_live_model_chain,
@@ -22,7 +21,7 @@ from st_agent.domain.case import CardDelivery, LorebookDelivery
 from st_agent.outcomes import TurnOutcome
 from st_agent.services.workspace import create_case
 from tests.fakes import ScriptedModel
-from tests.test_wp06_integration import BRIEF_ARGS, _happy_script, _source_service
+from tests.test_wp06_integration import BRIEF_ARGS, _authorized_case, _happy_script, _source_service
 
 CANONICAL = Path(__file__).resolve().parents[1] / "docs" / "spikes" / "wp-09-canonical.md"
 
@@ -38,30 +37,32 @@ def test_wp09_canonical_fixture_roundtrips() -> None:
     assert {entry.entry_id for entry in doc.lorebook.entries} == {"reedwick-jetty", "cinderwake"}
 
 
-def test_live_chain_keeps_full_timeout_for_each_model() -> None:
-    seen: list[tuple[str, float]] = []
+def test_live_chain_tries_next_model_after_failure() -> None:
+    seen: list[str] = []
 
-    def invoke(model_id: str, timeout_s: float) -> TurnOutcome:
-        seen.append((model_id, timeout_s))
+    def invoke(model_id: str) -> TurnOutcome:
+        seen.append(model_id)
         if model_id == "hy3":
-            raise TimeoutError("first model budget")
+            raise TimeoutError("connect")
         return TurnOutcome(kind="blocked", message="fallback ran", blocker="probe")
 
-    outcome, err = try_live_model_chain(("hy3", "glm-5.3-flash"), invoke, timeout_s=90.0)
-    assert seen == [("hy3", 90.0), ("glm-5.3-flash", 90.0)]
+    outcome, err = try_live_model_chain(("hy3", "glm-5.3-flash"), invoke)
+    assert seen == ["hy3", "glm-5.3-flash"]
     assert err == ""
     assert outcome is not None
     assert outcome.message == "fallback ran"
-    assert LIVE_TIMEOUT_S == 90.0
 
 
-def test_live_model_disables_thinking() -> None:
+def test_live_http_timeout_fails_connect_not_long_reads() -> None:
     model = _live_model(
         "deepseek-v4-flash-0731",
         base_url="https://example.invalid/v1",
         key="k",
-        timeout_s=30,
     )
+    timeout = model.client_args["timeout"]
+    assert timeout.connect == 15.0
+    assert timeout.read is None
+    assert timeout.write == 60.0
     assert model.config["params"]["extra_body"]["enable_thinking"] is False
 
 
@@ -74,13 +75,15 @@ def test_system_prompt_requires_canonical_roundtrip() -> None:
     assert "check_official_sources" in SYSTEM_PROMPT
     assert "validate_deliverables" in SYSTEM_PROMPT
     assert "finish_case" in SYSTEM_PROMPT
+    assert "build_confirmed" in SYSTEM_PROMPT
+    assert "confirm" in SYSTEM_PROMPT
 
 
 def test_save_brief_writes_importable_canonical(tmp_path: Path) -> None:
     from st_agent.services.serializers import serialize_character
     from st_agent.services.validators import validate_card
 
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     ctx = ToolContext(case_root=case_root, invocation_id="inv-brief", operation_id="op-brief")
     tools = {item.tool_name: item._tool_func for item in bind_tools(ctx)}
     args = {**BRIEF_ARGS, "lorebook_output": "both"}
@@ -99,7 +102,7 @@ def test_save_brief_writes_importable_canonical(tmp_path: Path) -> None:
 
 
 def test_brief_then_builds_can_finish(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     ctx = ToolContext(
         case_root=case_root,
         invocation_id="inv-finish",
@@ -119,7 +122,7 @@ def test_brief_then_builds_can_finish(tmp_path: Path) -> None:
 
 
 def test_invalid_canonical_save_keeps_auto_file(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     ctx = ToolContext(case_root=case_root, invocation_id="inv-keep", operation_id="op-keep")
     tools = {item.tool_name: item._tool_func for item in bind_tools(ctx)}
     assert tools["save_brief"](**BRIEF_ARGS)["ok"] is True
@@ -132,7 +135,7 @@ def test_invalid_canonical_save_keeps_auto_file(tmp_path: Path) -> None:
 
 
 def test_canonical_save_stops_after_three_invalid(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     ctx = ToolContext(case_root=case_root, invocation_id="inv-bound", operation_id="op-bound")
     tools = {item.tool_name: item._tool_func for item in bind_tools(ctx)}
     assert tools["save_brief"](**BRIEF_ARGS)["ok"] is True
@@ -184,7 +187,60 @@ def test_live_missing_outcome_is_timeout_not_provider_failure(
     outcome, _ = submit_turn(case_root, "Hello.", operation_id="op-live-timeout")
     assert outcome.kind == "blocked"
     assert outcome.blocker == "live-timeout"
-    assert "time budget" in (outcome.message or "")
+    assert "stopped responding" in (outcome.message or "").lower() or "unreachable" in (
+        outcome.message or ""
+    ).lower()
+
+
+def test_submit_turn_uses_explicit_live_connection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, str] = {}
+
+    def fake_env() -> None:
+        raise AssertionError("must not load env files")
+
+    monkeypatch.setattr("st_agent.application.case_controller.load_local_env", fake_env)
+
+    def fake_live(model_id: str, *, base_url: str, key: str):
+        seen["model_id"] = model_id
+        seen["base_url"] = base_url
+        seen["key"] = key
+        return object()
+
+    monkeypatch.setattr("st_agent.application.case_controller._live_model", fake_live)
+
+    class _Result:
+        structured_output = TurnOutcome(
+            kind="question", message="Need a portrait.", question="Upload?"
+        )
+
+    class _Agent:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        def __call__(self, *args, **kwargs):
+            return _Result()
+
+    monkeypatch.setattr("st_agent.application.case_controller.Agent", _Agent)
+    case_root = create_case(tmp_path, "harbor-watch")
+    outcome, _ = submit_turn(
+        case_root,
+        "Hello.",
+        operation_id="op-live-cfg",
+        live_settings=RuntimeSettings(
+            provider="Alibaba-Token",
+            base_url="https://example.invalid/v1",
+            model_id="page-model",
+        ),
+        live_key="session-key",
+    )
+    assert outcome.kind == "question"
+    assert seen == {
+        "model_id": "page-model",
+        "base_url": "https://example.invalid/v1",
+        "key": "session-key",
+    }
 
 
 def test_finish_ok_reports_delivered_if_model_says_blocked(tmp_path: Path) -> None:
@@ -196,7 +252,7 @@ def test_finish_ok_reports_delivered_if_model_says_blocked(tmp_path: Path) -> No
             "blocker": "case-state: closed",
         }
     }
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     outcome, _ = submit_turn(
         case_root,
         "Make a JSON card.",

@@ -48,7 +48,7 @@ _BLOCKER_HELP = {
     ),
     "b-ai-models-unavailable": "The model provider is unavailable. Wait a moment and retry.",
     "live-timeout": (
-        "The live turn hit the time budget. Saved files were kept. Send again to continue."
+        "The model stopped responding. Saved files were kept. Send again to continue."
     ),
     "ungated-delivery": "Delivery was not accepted. Continue until finish_case passes the gate.",
     "case-closed": "This case is closed. Start a new case or open a modification.",
@@ -56,7 +56,9 @@ _BLOCKER_HELP = {
     "revision-mismatch": "The case changed. Refresh and retry your message.",
     "invalid-phase": "That step is not allowed now. Follow the current phase shown above.",
     "invalid-outcome": "The model reply was not usable. Retry the turn.",
-    "provider": "The model provider failed. Retry the turn.",
+    "confirm-required": (
+        "Confirm the brief in your next message (yes / confirm) before the card is written."
+    ),
     "cleanup_pending": "Cleanup did not finish. Resume this case to retry cleanup.",
 }
 
@@ -163,6 +165,20 @@ def next_operation_id(store: dict[str, int]) -> str:
 def empty_turn_error(message: str, upload_count: int) -> str | None:
     if not message.strip() and upload_count == 0:
         return "Message is empty."
+    return None
+
+
+def session_config_error(
+    provider: str, base_url: str, model_id: str, api_key: str
+) -> str | None:
+    if not provider.strip():
+        return "Provider is missing."
+    if not base_url.strip():
+        return "OpenAI Base URL is missing."
+    if not model_id.strip():
+        return "Model is missing."
+    if not api_key.strip():
+        return "API key is missing."
     return None
 
 

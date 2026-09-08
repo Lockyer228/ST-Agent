@@ -85,6 +85,9 @@ class CaseManifest(BaseModel):
     lineage: dict[str, Lineage] = Field(default_factory=dict)
     blocker: Blocker | None = None
     pending_question: str | None = None
+    pending_confirm: bool = False
+    build_confirmed: bool = False
+    portrait_ref: str | None = None
     retry_count: int = 0
     last_error: str | None = None
 
@@ -94,5 +97,11 @@ def apply_input_change(manifest: CaseManifest) -> CaseManifest:
         key: item.model_copy(update={"stale": True}) for key, item in manifest.lineage.items()
     }
     return manifest.model_copy(
-        update={"phase": Phase.intake, "condition": Condition.active, "lineage": lineage}
+        update={
+            "phase": Phase.intake,
+            "condition": Condition.active,
+            "lineage": lineage,
+            "build_confirmed": False,
+            "pending_confirm": False,
+        }
     )

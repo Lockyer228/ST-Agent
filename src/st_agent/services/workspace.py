@@ -304,6 +304,21 @@ def save_manifest(
     return updated
 
 
+def authorize_build(case_root: Path) -> CaseManifest:
+    manifest = load_manifest(case_root)
+    return save_manifest(
+        case_root,
+        manifest.model_copy(
+            update={
+                "build_confirmed": True,
+                "pending_confirm": False,
+                "condition": Condition.active,
+                "pending_question": None,
+            }
+        ),
+    )
+
+
 def _kind_for(path: Path) -> str:
     from st_agent.services.readers import InputKind, sniff_path
 
@@ -311,13 +326,15 @@ def _kind_for(path: Path) -> str:
     if suffix in REJECTED_SUFFIXES:
         raise UnsupportedInput(f"unsupported file type: {suffix}")
     kind = sniff_path(path)
-    if kind in {InputKind.image, InputKind.png_card}:
+    if kind is InputKind.png_card:
+        return "png_card"
+    if kind is InputKind.image:
         return "image"
     return kind.value
 
 
 def _asset_dir(kind: str) -> str:
-    if kind == "image":
+    if kind in {"image", "png_card"}:
         return f"{ASSETS_DIR}/portraits"
     return ASSETS_DIR
 
@@ -339,7 +356,7 @@ def _check_limits(path: Path, kind: str, *, existing_count: int, existing_bytes:
         raise LimitExceeded(f"{path.name} exceeds the 50 MiB case limit")
     if kind in {"text", "json"} and size > MAX_TEXT_BYTES:
         raise LimitExceeded(f"{path.name} exceeds the 2 MiB text/JSON limit")
-    if kind == "image":
+    if kind in {"image", "png_card"}:
         if size > MAX_IMAGE_BYTES:
             raise LimitExceeded(f"{path.name} exceeds the 20 MiB image limit")
         try:
@@ -360,6 +377,7 @@ def save_user_inputs(case_root: Path, sources: Sequence[Path]) -> list:
 
     manifest = load_manifest(case_root)
     refs = list(manifest.inputs)
+    added = []
     count, total = _manifest_totals(case_root, refs)
     for source in sources:
         origin = source.resolve()
@@ -376,17 +394,20 @@ def save_user_inputs(case_root: Path, sources: Sequence[Path]) -> list:
         count += 1
         total += dest.stat().st_size
         rel = dest.relative_to(canonicalize_root(case_root)).as_posix()
-        refs.append(
-            ArtifactRef(
-                logical_id=dest.stem,
-                relative_path=rel,
-                sha256=file_sha256(dest),
-                kind=kind,
-            )
+        ref = ArtifactRef(
+            logical_id=dest.stem,
+            relative_path=rel,
+            sha256=file_sha256(dest),
+            kind=kind,
         )
+        refs.append(ref)
+        added.append(ref)
     names = "\n".join(f"- {item.relative_path}" for item in refs)
     atomic_write(contained_path(case_root, WORK_DIR, "inputs.md"), f"Accepted inputs:\n{names}\n")
     manifest.inputs = refs
+    plains = [item for item in added if item.kind == "image"]
+    if len(plains) == 1:
+        manifest = manifest.model_copy(update={"portrait_ref": plains[0].relative_path})
     save_manifest(case_root, apply_input_change(manifest) if refs else manifest)
     return refs
 
@@ -417,6 +438,8 @@ def compact_context(case_root: Path, max_chars: int = 800) -> dict[str, object]:
     return {
         "phase": str(manifest.phase),
         "condition": str(manifest.condition),
+        "build_confirmed": manifest.build_confirmed,
+        "portrait_ref": manifest.portrait_ref,
         "intake": _snippet("intake.md"),
         "brief": _snippet("brief.md"),
         "files": files,

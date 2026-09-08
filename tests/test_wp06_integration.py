@@ -17,7 +17,7 @@ from st_agent.application.tools import ToolContext, run_delivery_checks
 from st_agent.domain.canonical import CanonicalDocument, render_canonical
 from st_agent.domain.content import CaseBrief, CharacterContent, DeliveryPreferences
 from st_agent.official_sources import OfficialSourceService
-from st_agent.services.workspace import append_intake, create_case, load_manifest
+from st_agent.services.workspace import append_intake, authorize_build, create_case, load_manifest
 from tests.fakes import ScriptedModel
 
 BRIEF_ARGS = {
@@ -85,6 +85,12 @@ def _happy_script() -> list[dict]:
     ]
 
 
+def _authorized_case(tmp_path: Path) -> Path:
+    case_root = create_case(tmp_path, "harbor-watch")
+    authorize_build(case_root)
+    return case_root
+
+
 def test_tool_failed_reads_wrapped_envelope() -> None:
     from st_agent.application.hooks import _tool_failed
 
@@ -117,7 +123,7 @@ def test_finish_case_rejects_missing_gate(tmp_path: Path) -> None:
 
 
 def test_fake_model_completes_json_delivery(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     outcome, events = submit_turn(
         case_root,
         "Make a JSON card for Mara.",
@@ -137,7 +143,7 @@ def test_fake_model_completes_json_delivery(tmp_path: Path) -> None:
 
 
 def test_duplicate_operation_is_idempotent(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     model = ScriptedModel(_happy_script())
     first, _ = submit_turn(
         case_root,
@@ -178,6 +184,7 @@ def test_question_waits_then_resumes(tmp_path: Path) -> None:
     assert first.kind == "question"
     manifest = load_manifest(case_root)
     assert manifest.condition == "waiting_for_user"
+    authorize_build(case_root)
     second, _ = submit_turn(
         case_root,
         "Use JSON instead.",
@@ -250,7 +257,7 @@ def test_invalid_outcome_is_repaired(tmp_path: Path) -> None:
 def test_format_repair_bound_is_enforced(tmp_path: Path) -> None:
     from st_agent.application.tools import bind_tools
 
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     ctx = ToolContext(case_root=case_root, invocation_id="i1", operation_id="op-repair-bound")
     validate = next(item for item in bind_tools(ctx) if item.tool_name == "validate_deliverables")
     first = validate._tool_func()
@@ -262,7 +269,7 @@ def test_format_repair_bound_is_enforced(tmp_path: Path) -> None:
 
 
 def test_invalid_canonical_is_repairable(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     outcome, events = submit_turn(
         case_root,
         "Write canonical text.",

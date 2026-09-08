@@ -32,6 +32,12 @@ If card format is unanswered, continue with **JSON**. That default does not gran
 
 A portrait upload is not by itself a PNG request. If PNG is requested and the image is missing, keep writing text and ask only for the image.
 
+If exactly one plain portrait is already bound on the case, use it. Do not ask the user to choose among files.
+
+## Confirm before writing
+
+When the stop conditions are met, summarize the brief and ask the user to reply `yes` or `confirm`. Set `TurnOutcome.confirm=true`. Do not call `save_brief` or later tools until case context `build_confirmed` is true.
+
 ## Persistence
 
 Save the answer in case files before the next model or downstream step. Do not keep a private chat-only approval loop, and do not store Q&A as long-term memory across cases.

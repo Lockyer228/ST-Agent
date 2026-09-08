@@ -125,6 +125,16 @@ def _phase_error(current: Phase, target: Phase) -> dict[str, Any]:
     )
 
 
+def _require_confirm(case_root: Path) -> dict[str, Any] | None:
+    if load_manifest(case_root).build_confirmed:
+        return None
+    return envelope(
+        ok=False,
+        code="confirm-required",
+        message="Confirm the brief before writing the card.",
+    )
+
+
 def _advance(
     case_root: Path, *targets: Phase, operation_id: str | None = None
 ) -> tuple[CaseManifest | None, dict[str, Any] | None]:
@@ -237,6 +247,11 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
         lorebook_output: Literal["none", "standalone", "embedded", "both"] = "none",
         portrait_ref: str = "",
     ) -> dict[str, Any]:
+        gated = _require_confirm(case_root)
+        if gated:
+            return gated
+        if not portrait_ref.strip():
+            portrait_ref = load_manifest(case_root).portrait_ref or ""
         fields = (
             experience_goal,
             player_role,
@@ -313,6 +328,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
         kind: Literal["draft", "canonical"],
         markdown: str,
     ) -> dict[str, Any]:
+        gated = _require_confirm(case_root)
+        if gated:
+            return gated
         if _too_long(markdown, MAX_MARKDOWN):
             return envelope(
                 ok=False, code="field-too-long", message="document exceeds the size limit"
@@ -371,6 +389,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
 
     @tool
     def build_character_card() -> dict[str, Any]:
+        gated = _require_confirm(case_root)
+        if gated:
+            return gated
         loaded = _load_canonical(case_root)
         if isinstance(loaded, dict):
             return loaded
@@ -431,6 +452,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
 
     @tool
     def build_lorebook() -> dict[str, Any]:
+        gated = _require_confirm(case_root)
+        if gated:
+            return gated
         loaded = _load_canonical(case_root)
         if isinstance(loaded, dict):
             return loaded
@@ -488,6 +512,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
 
     @tool
     def build_png_card() -> dict[str, Any]:
+        gated = _require_confirm(case_root)
+        if gated:
+            return gated
         loaded = _load_canonical(case_root)
         if isinstance(loaded, dict):
             return loaded
@@ -542,6 +569,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
 
     @tool
     def check_official_sources() -> dict[str, Any]:
+        gated = _require_confirm(case_root)
+        if gated:
+            return gated
         manifest = load_manifest(case_root)
         if manifest.phase not in SOURCE_PHASES:
             return _phase_error(manifest.phase, Phase.official_check)
@@ -582,6 +612,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
 
     @tool
     def validate_deliverables() -> dict[str, Any]:
+        gated = _require_confirm(case_root)
+        if gated:
+            return gated
         result = run_delivery_checks(case_root)
         if not result.ok:
             ctx.format_repairs += 1
@@ -599,6 +632,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
 
     @tool
     def finish_case() -> dict[str, Any]:
+        gated = _require_confirm(case_root)
+        if gated:
+            return gated
         result = run_delivery_checks(case_root)
         if not result.ok:
             return envelope(ok=False, code="delivery-gate", issues=result.issues)

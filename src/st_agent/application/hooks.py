@@ -92,8 +92,12 @@ class SanitizedHooks:
 
     def _emit(self, event: str) -> None:
         self.events.append(event)
-        if self._sink is not None:
+        if self._sink is None:
+            return
+        try:
             self._sink(event)
+        except Exception:
+            return
 
     def before_tool(self, event: BeforeToolCallEvent) -> None:
         name = _tool_name(event)

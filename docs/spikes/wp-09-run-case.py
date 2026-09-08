@@ -11,8 +11,7 @@ import shutil
 import time
 from pathlib import Path
 
-from st_agent.application import case_controller as _case_controller
-from st_agent.application.case_controller import LIVE_TIMEOUT_S, submit_turn
+from st_agent.application.case_controller import submit_turn
 from st_agent.config import api_key, load_local_env, load_settings
 from st_agent.services.workspace import create_case
 from st_agent.ui.view import sanitize_events
@@ -23,11 +22,6 @@ CANONICAL = Path(__file__).with_name("wp-09-canonical.md")
 LOG_PATH = Path(os.environ.get("ST_AGENT_WP09_LOG") or Path(__file__).with_name("wp-09-run-log.json"))
 WORKSPACE = Path(os.environ.get("TEMP") or os.environ.get("TMP") or "/tmp") / "st-agent-wp09-rc"
 MAX_TURNS = 8
-_TIMEOUT_OVERRIDE = os.environ.get("ST_AGENT_LIVE_TIMEOUT_S")
-WORKING_TIMEOUT_S = float(_TIMEOUT_OVERRIDE) if _TIMEOUT_OVERRIDE else LIVE_TIMEOUT_S
-FIRST_TURN_TIMEOUT_S = float(os.environ.get("ST_AGENT_FIRST_TURN_S") or 25)
-if _TIMEOUT_OVERRIDE:
-    _case_controller.LIVE_TIMEOUT_S = WORKING_TIMEOUT_S
 HARD_BLOCKERS = {
     "b-ai-credentials-missing",
     "b-ai-models-unavailable",
@@ -87,8 +81,6 @@ def main() -> int:
         "base_url": settings.base_url,
         "preferred_model": settings.model_id,
         "key_present": key is not None,
-        "live_timeout_s": WORKING_TIMEOUT_S,
-        "first_turn_timeout_s": FIRST_TURN_TIMEOUT_S,
         "turns": [],
         "elapsed_s": 0.0,
         "result": "not-started",
@@ -113,9 +105,6 @@ def main() -> int:
     final_kind = "blocked"
 
     for turn in range(1, MAX_TURNS + 1):
-        _case_controller.LIVE_TIMEOUT_S = (
-            FIRST_TURN_TIMEOUT_S if turn == 1 else WORKING_TIMEOUT_S
-        )
         outcome, events = submit_turn(
             case_root,
             message,

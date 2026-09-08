@@ -26,6 +26,28 @@ CONTENT_PHASES = {
     Phase.delivery,
 }
 
+_CONFIRM_REPLIES = frozenset(
+    {
+        "yes",
+        "y",
+        "ok",
+        "okay",
+        "confirm",
+        "confirmed",
+        "proceed",
+        "go",
+        "go ahead",
+    }
+)
+
+
+def is_confirm_reply(message: str) -> bool:
+    text = message.strip().lower()
+    text = text.replace("。", "").replace("！", "")
+    text = text.rstrip(".!")
+    text = " ".join(text.split())
+    return text in _CONFIRM_REPLIES
+
 
 class InvalidTransition(ValueError):
     """The requested phase or condition change is not allowed."""
@@ -89,15 +111,19 @@ def clear_wait(manifest: CaseManifest) -> CaseManifest:
         manifest,
         condition=Condition.active,
         pending_question=None,
+        pending_confirm=False,
         blocker=None,
     )
 
 
-def mark_waiting(manifest: CaseManifest, question: str) -> CaseManifest:
+def mark_waiting(
+    manifest: CaseManifest, question: str, *, confirm: bool = False
+) -> CaseManifest:
     return _replace(
         manifest,
         condition=Condition.waiting_for_user,
         pending_question=question,
+        pending_confirm=confirm,
         blocker=None,
     )
 

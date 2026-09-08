@@ -26,6 +26,7 @@ from st_agent.services.workspace import (
 from tests.fakes import ScriptedModel
 from tests.test_wp06_integration import (
     BRIEF_ARGS,
+    _authorized_case,
     _canonical_markdown,
     _happy_script,
     _source_service,
@@ -41,7 +42,7 @@ def _fn(ctx: ToolContext, name: str):
 
 
 def test_portrait_ref_rejects_relative_and_absolute_escape(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     outside = tmp_path / "outside.png"
     outside.write_bytes(b"not-a-real-png")
     save_brief = _fn(_ctx(case_root), "save_brief")
@@ -66,7 +67,7 @@ def test_canonical_portrait_line_rejects_escape() -> None:
 
 
 def test_save_brief_invalid_phase_does_not_write(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     ctx = _ctx(case_root)
     assert _fn(ctx, "save_brief")(**BRIEF_ARGS)["ok"] is True
     assert _fn(ctx, "save_content_document")(kind="canonical", markdown=_canonical_markdown())[
@@ -81,7 +82,7 @@ def test_save_brief_invalid_phase_does_not_write(tmp_path: Path) -> None:
 
 
 def test_repair_loop_after_official_check_rewrites_lineage(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     repaired = _canonical_markdown().replace("Mara wipes a mug", "Mara sets a mug down")
     outcome, _ = submit_turn(
         case_root,
@@ -127,7 +128,7 @@ def test_repair_loop_after_official_check_rewrites_lineage(tmp_path: Path) -> No
 
 
 def test_closed_readme_lists_deliverables(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     outcome, _ = submit_turn(
         case_root,
         "Make a JSON card.",
@@ -187,7 +188,7 @@ def test_corrupt_operation_cache_is_ignored(tmp_path: Path) -> None:
 
 
 def test_tool_saves_use_per_call_operation_ids(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     ctx = _ctx(case_root)
     first = _fn(ctx, "save_brief")(**BRIEF_ARGS)
     second = _fn(ctx, "save_brief")(**{**BRIEF_ARGS, "experience_goal": "A tighter goal."})
@@ -197,7 +198,7 @@ def test_tool_saves_use_per_call_operation_ids(tmp_path: Path) -> None:
 
 
 def test_finish_case_reports_invalid_phase(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     ctx = _ctx(case_root)
     _fn(ctx, "save_brief")(**BRIEF_ARGS)
     result = _fn(ctx, "finish_case")()
@@ -207,7 +208,7 @@ def test_finish_case_reports_invalid_phase(tmp_path: Path) -> None:
 
 
 def test_official_source_failure_does_not_advance(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     ctx = ToolContext(
         case_root=case_root,
         invocation_id="inv-src",
@@ -270,7 +271,7 @@ def test_submit_turn_blocked_when_locked(tmp_path: Path) -> None:
 
 
 def test_repair_retries_do_not_multiply_turn_budget(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     steps = [{"tools": [{"name": "save_brief", "input": BRIEF_ARGS}]} for _ in range(20)]
     outcome, events = submit_turn(
         case_root,
@@ -285,7 +286,7 @@ def test_repair_retries_do_not_multiply_turn_budget(tmp_path: Path) -> None:
 
 
 def test_lineage_hash_matches_export_after_rebuild(tmp_path: Path) -> None:
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     ctx = ToolContext(
         case_root=case_root,
         invocation_id="inv-1",

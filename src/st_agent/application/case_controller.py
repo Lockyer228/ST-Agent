@@ -8,6 +8,7 @@ import uuid
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+import httpx
 from pydantic import ValidationError
 from strands import Agent
 from strands.models import Model
@@ -15,9 +16,20 @@ from strands.models.openai import OpenAIModel
 
 from st_agent.application.assembly import assemble_prompt
 from st_agent.application.hooks import SanitizedHooks
-from st_agent.application.lifecycle import clear_wait, mark_blocked, mark_waiting
+from st_agent.application.lifecycle import (
+    clear_wait,
+    is_confirm_reply,
+    mark_blocked,
+    mark_waiting,
+)
 from st_agent.application.tools import ToolContext, bind_tools
-from st_agent.config import api_key, authorized_model_chain, load_local_env, load_settings
+from st_agent.config import (
+    RuntimeSettings,
+    api_key,
+    authorized_model_chain,
+    load_local_env,
+    load_settings,
+)
 from st_agent.domain.case import Condition
 from st_agent.official_sources import OfficialSourceService
 from st_agent.outcomes import TurnOutcome
@@ -26,6 +38,7 @@ from st_agent.services.workspace import (
     ClosedCaseError,
     append_intake,
     atomic_write,
+    authorize_build,
     canonicalize_root,
     case_lock,
     load_manifest,
@@ -36,26 +49,34 @@ from st_agent.services.workspace import (
 MAX_TURNS = 12
 PROVIDER_RETRIES = 1
 OUTCOME_REPAIRS = 1
-LIVE_TIMEOUT_S = 90.0
+CONNECT_TIMEOUT_S = 15.0
+WRITE_TIMEOUT_S = 60.0
+POOL_TIMEOUT_S = 15.0
 OPERATION_FILE = "last-operation.json"
 
 
 def try_live_model_chain(
     model_ids: Sequence[str],
     invoke,
-    *,
-    timeout_s: float | None = None,
 ) -> tuple[TurnOutcome | None, str]:
-    """Run each authorized model with its own timeout. Fallback can still start."""
+    """Try each authorized model. No shared wall-clock budget."""
 
-    budget = LIVE_TIMEOUT_S if timeout_s is None else timeout_s
     last_error = "unavailable"
     for model_id in model_ids:
         try:
-            return invoke(model_id, budget), ""
+            return invoke(model_id), ""
         except Exception as exc:
             last_error = f"{type(exc).__name__}: {exc}"[:240]
     return None, last_error
+
+
+def _http_timeout() -> httpx.Timeout:
+    return httpx.Timeout(
+        connect=CONNECT_TIMEOUT_S,
+        read=None,
+        write=WRITE_TIMEOUT_S,
+        pool=POOL_TIMEOUT_S,
+    )
 
 
 def _operation_path(case_root: Path) -> Path:
@@ -82,9 +103,9 @@ def _store_cached(case_root: Path, operation_id: str, outcome: TurnOutcome) -> N
     )
 
 
-def _live_model(model_id: str, *, base_url: str, key: str, timeout_s: float) -> OpenAIModel:
+def _live_model(model_id: str, *, base_url: str, key: str) -> OpenAIModel:
     return OpenAIModel(
-        client_args={"api_key": key, "base_url": base_url, "timeout": max(timeout_s, 1.0)},
+        client_args={"api_key": key, "base_url": base_url, "timeout": _http_timeout()},
         model_id=model_id,
         params={"extra_body": {"enable_thinking": False}},
     )
@@ -100,6 +121,8 @@ def submit_turn(
     model: Model | None = None,
     source_service: OfficialSourceService | None = None,
     event_sink: Callable[[str], None] | None = None,
+    live_settings: RuntimeSettings | None = None,
+    live_key: str | None = None,
 ) -> tuple[TurnOutcome, list[str]]:
     case_root = canonicalize_root(case_root)
     try:
@@ -113,6 +136,8 @@ def submit_turn(
                 model=model,
                 source_service=source_service,
                 event_sink=event_sink,
+                live_settings=live_settings,
+                live_key=live_key,
             )
     except CaseLocked:
         return (
@@ -131,6 +156,8 @@ def _submit_locked(
     model: Model | None,
     source_service: OfficialSourceService | None,
     event_sink: Callable[[str], None] | None = None,
+    live_settings: RuntimeSettings | None = None,
+    live_key: str | None = None,
 ) -> tuple[TurnOutcome, list[str]]:
     cached = _load_cached(case_root, operation_id)
     if cached is not None:
@@ -155,9 +182,12 @@ def _submit_locked(
         save_user_inputs(case_root, uploads)
     append_intake(case_root, f"User: {message}")
 
-    if manifest.condition == Condition.waiting_for_user:
-        save_manifest(case_root, clear_wait(manifest))
-        manifest = load_manifest(case_root)
+    waiting = manifest.condition == Condition.waiting_for_user
+    pending_confirm = manifest.pending_confirm
+    if pending_confirm and is_confirm_reply(message):
+        authorize_build(case_root)
+    elif waiting:
+        save_manifest(case_root, clear_wait(load_manifest(case_root)))
 
     ctx = ToolContext(
         case_root=case_root,
@@ -208,9 +238,15 @@ def _submit_locked(
         return TurnOutcome.model_validate(outcome)
 
     if model is None:
-        load_local_env()
-        settings = load_settings()
-        key = api_key()
+        if live_settings is not None:
+            settings = live_settings
+            key = (live_key or "").strip() or None
+            model_ids: Sequence[str] = (settings.model_id,)
+        else:
+            load_local_env()
+            settings = load_settings()
+            key = api_key()
+            model_ids = authorized_model_chain(settings.model_id)
         if key is None:
             outcome = TurnOutcome(
                 kind="blocked",
@@ -218,28 +254,23 @@ def _submit_locked(
                 blocker="b-ai-credentials-missing",
             )
         else:
-            def _live_invoke(model_id: str, timeout_s: float) -> TurnOutcome:
+            def _live_invoke(model_id: str) -> TurnOutcome:
                 return _invoke(
                     _live_model(
                         model_id,
                         base_url=settings.base_url,
                         key=key,
-                        timeout_s=timeout_s,
                     ),
                     user_prompt,
-                    timeout_s=timeout_s,
                 )
 
-            outcome, last_error = try_live_model_chain(
-                authorized_model_chain(settings.model_id),
-                _live_invoke,
-            )
+            outcome, last_error = try_live_model_chain(model_ids, _live_invoke)
             if outcome is None:
                 if "TurnOutcome is missing" in last_error:
                     outcome = TurnOutcome(
                         kind="blocked",
                         message=(
-                            "The live turn reached the time budget. "
+                            "The model stopped responding. "
                             "Saved files are kept; send again to continue."
                         ),
                         blocker="live-timeout",
@@ -314,7 +345,7 @@ def _accept_outcome(case_root: Path, ctx: ToolContext, outcome: TurnOutcome) -> 
         return outcome
     if outcome.kind == "question":
         question = (outcome.question or outcome.message).strip()
-        save_manifest(case_root, mark_waiting(manifest, question))
+        save_manifest(case_root, mark_waiting(manifest, question, confirm=outcome.confirm))
     elif outcome.kind == "blocked":
         save_manifest(
             case_root,

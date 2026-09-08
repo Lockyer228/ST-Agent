@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from st_agent.application.case_controller import submit_turn
+from st_agent.config import RuntimeSettings
 from st_agent.domain.case import CaseMode
 from st_agent.services.readers import UnsupportedInput
 from st_agent.services.workspace import PathRejected, create_case, load_manifest
@@ -115,9 +116,9 @@ def test_activity_label_covers_tools_and_hides_internals() -> None:
 
 
 def test_event_sink_receives_tools_before_return(tmp_path: Path) -> None:
-    from tests.test_wp06_integration import _happy_script, _source_service
+    from tests.test_wp06_integration import _authorized_case, _happy_script, _source_service
 
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     seen: list[str] = []
     finished = {"done": False}
 
@@ -144,15 +145,35 @@ def test_event_sink_receives_tools_before_return(tmp_path: Path) -> None:
 
 
 def test_submit_turn_without_sink_stays_compatible(tmp_path: Path) -> None:
-    from tests.test_wp06_integration import _happy_script, _source_service
+    from tests.test_wp06_integration import _authorized_case, _happy_script, _source_service
 
-    case_root = create_case(tmp_path, "harbor-watch")
+    case_root = _authorized_case(tmp_path)
     outcome, events = submit_turn(
         case_root,
         "Make a JSON card for Mara.",
         operation_id="op-nosink",
         model=ScriptedModel(_happy_script()),
         source_service=_source_service(),
+    )
+    assert outcome.kind == "delivered"
+    assert any(item.startswith("tool-start:save_brief") for item in events)
+
+
+def test_event_sink_exception_does_not_fail_turn(tmp_path: Path) -> None:
+    from tests.test_wp06_integration import _authorized_case, _happy_script, _source_service
+
+    case_root = _authorized_case(tmp_path)
+
+    def sink(_event: str) -> None:
+        raise RuntimeError("NoSessionContext")
+
+    outcome, events = submit_turn(
+        case_root,
+        "Make a JSON card for Mara.",
+        operation_id="op-sink-err",
+        model=ScriptedModel(_happy_script()),
+        source_service=_source_service(),
+        event_sink=sink,
     )
     assert outcome.kind == "delivered"
     assert any(item.startswith("tool-start:save_brief") for item in events)
@@ -198,6 +219,17 @@ def test_empty_turn_error_blocks_blank_message_without_uploads() -> None:
     assert empty_turn_error("   ", 0) == "Message is empty."
     assert empty_turn_error("A tavern keeper.", 0) is None
     assert empty_turn_error("", 1) is None
+
+
+def test_session_config_error_requires_connection_fields() -> None:
+    from st_agent.ui.view import session_config_error
+
+    url = "https://example.invalid/v1"
+    assert session_config_error("", url, "m", "k") == "Provider is missing."
+    assert session_config_error("P", "", "m", "k") == "OpenAI Base URL is missing."
+    assert session_config_error("P", url, "", "k") == "Model is missing."
+    assert session_config_error("P", url, "m", "") == "API key is missing."
+    assert session_config_error("P", url, "m", "k") is None
 
 
 def test_write_upload_keeps_basename_only(tmp_path: Path) -> None:
@@ -263,27 +295,85 @@ def test_question_envelope_feeds_status_guidance(tmp_path: Path) -> None:
     assert not any(item.startswith(("prompt:", "reasoning:")) for item in kept)
 
 
+def _click(app, label: str) -> None:
+    next(item for item in app.button if item.label == label).click().run()
+
+
+def _input_by_label(app, label: str):
+    for group in (app.text_input, app.sidebar.text_input):
+        for item in group:
+            if item.label == label:
+                return item
+    raise LookupError(label)
+
+
+def _fill_connection(
+    app,
+    *,
+    provider: str = "Alibaba-Token",
+    base_url: str = "https://example.invalid/v1",
+    model: str = "page-model",
+    api_key: str = "session-key",
+) -> None:
+    _input_by_label(app, "Provider").input(provider)
+    _input_by_label(app, "OpenAI Base URL").input(base_url)
+    _input_by_label(app, "Model").input(model)
+    _input_by_label(app, "API key").input(api_key)
+
+
+def test_product_page_shows_connection_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "st_agent.ui.app.submit_turn",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not submit")),
+    )
+    from streamlit.testing.v1 import AppTest
+
+    script = Path(__file__).resolve().parents[1] / "app.py"
+    at = AppTest.from_file(str(script), default_timeout=20)
+    at.run()
+    assert not at.exception
+    labels = [item.label for item in [*at.text_input, *at.sidebar.text_input]]
+    assert "Provider" in labels
+    assert "OpenAI Base URL" in labels
+    assert "Model" in labels
+    assert "API key" in labels
+    page = "\n".join(
+        str(item.value)
+        for item in [
+            *at.markdown,
+            *at.caption,
+            *at.text,
+            *at.sidebar.markdown,
+            *at.sidebar.caption,
+            *at.sidebar.text,
+        ]
+    )
+    assert "not configured" in page.lower()
+    assert "openai-compatible" in page.lower()
+    assert "anthropic" in page.lower()
+    assert "discarded when the app stops" in page.lower()
+
+
 def test_product_page_creates_and_resumes_case(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from st_agent.outcomes import TurnOutcome
 
-    monkeypatch.setattr("st_agent.ui.app.load_local_env", lambda: None)
-    monkeypatch.setattr(
-        "st_agent.ui.app.submit_turn",
-        lambda *args, **kwargs: (
+    seen: dict[str, object] = {}
+
+    def fake_submit(*args, **kwargs):
+        seen.update(kwargs)
+        return (
             TurnOutcome(
                 kind="question",
                 message="Need a portrait file.",
                 question="Please upload a portrait.",
             ),
             ["tool-start:save_brief", "invocation-complete"],
-        ),
-    )
-    from streamlit.testing.v1 import AppTest
+        )
 
-    def click(app: AppTest, label: str) -> None:
-        next(item for item in app.button if item.label == label).click().run()
+    monkeypatch.setattr("st_agent.ui.app.submit_turn", fake_submit)
+    from streamlit.testing.v1 import AppTest
 
     script = Path(__file__).resolve().parents[1] / "app.py"
     at = AppTest.from_file(str(script), default_timeout=20)
@@ -292,29 +382,65 @@ def test_product_page_creates_and_resumes_case(
     labels = [item.value for item in at.subheader]
     assert "New project" in labels
     assert "Resume project" in labels
-    at.text_input[0].input(str(tmp_path))
-    at.text_input[1].input("harbor-watch")
-    click(at, "Create case")
+    _input_by_label(at, "Workspace folder").input(str(tmp_path))
+    _input_by_label(at, "Story name").input("harbor-watch")
+    _fill_connection(at)
+    _click(at, "Create case")
     assert not at.exception
     page = "\n".join(str(item.value) for item in [*at.markdown, *at.caption, *at.text])
     assert "setup" in page
     at.text_area[0].input("Make a JSON card.")
-    click(at, "Send")
+    _click(at, "Send")
     assert not at.exception
     page = "\n".join(str(item.value) for item in [*at.markdown, *at.text, *at.warning, *at.info])
     assert "Need a portrait file." in page or "Please upload a portrait." in page
     assert "Organizing the creative brief..." in page or "Waiting for your answer." in page
     assert "tool-start:save_brief" in page
     assert "Agent events" not in page
-    click(at, "Back to start")
-    at.text_input[2].input(str(tmp_path / "harbor-watch"))
-    click(at, "Resume case")
+    assert seen["live_key"] == "session-key"
+    settings = seen["live_settings"]
+    assert isinstance(settings, RuntimeSettings)
+    assert settings.provider == "Alibaba-Token"
+    assert settings.base_url == "https://example.invalid/v1"
+    assert settings.model_id == "page-model"
+    _click(at, "Back to start")
+    _input_by_label(at, "Existing case folder").input(str(tmp_path / "harbor-watch"))
+    _click(at, "Resume case")
     assert not at.exception
     page = "\n".join(
         str(item.value) for item in [*at.markdown, *at.caption, *at.text, *at.info]
     )
     assert "setup" in page
     assert "Resume:" in page
+
+
+def test_product_page_send_needs_api_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from st_agent.outcomes import TurnOutcome
+
+    calls: list[int] = []
+
+    def fake_submit(*args, **kwargs):
+        calls.append(1)
+        return TurnOutcome(kind="question", message="should not run"), []
+
+    monkeypatch.setattr("st_agent.ui.app.submit_turn", fake_submit)
+    from streamlit.testing.v1 import AppTest
+
+    script = Path(__file__).resolve().parents[1] / "app.py"
+    at = AppTest.from_file(str(script), default_timeout=20)
+    at.run()
+    _input_by_label(at, "Workspace folder").input(str(tmp_path))
+    _input_by_label(at, "Story name").input("harbor-watch")
+    _fill_connection(at, api_key="")
+    _click(at, "Create case")
+    at.text_area[0].input("Make a JSON card.")
+    _click(at, "Send")
+    assert not at.exception
+    assert calls == []
+    page = "\n".join(str(item.value) for item in [*at.error, *at.markdown, *at.text])
+    assert "API key is missing." in page
 
 
 def test_product_page_rejects_empty_send(
@@ -328,27 +454,23 @@ def test_product_page_rejects_empty_send(
         calls.append(1)
         return TurnOutcome(kind="question", message="should not run"), []
 
-    monkeypatch.setattr("st_agent.ui.app.load_local_env", lambda: None)
     monkeypatch.setattr("st_agent.ui.app.submit_turn", fake_submit)
     from streamlit.testing.v1 import AppTest
 
     script = Path(__file__).resolve().parents[1] / "app.py"
     at = AppTest.from_file(str(script), default_timeout=20)
     at.run()
-    at.text_input[0].input(str(tmp_path))
-    at.text_input[1].input("harbor-watch")
-    next(item for item in at.button if item.label == "Create case").click().run()
-    next(item for item in at.button if item.label == "Send").click().run()
+    _input_by_label(at, "Workspace folder").input(str(tmp_path))
+    _input_by_label(at, "Story name").input("harbor-watch")
+    _click(at, "Create case")
+    _click(at, "Send")
     assert not at.exception
     assert calls == []
     page = "\n".join(str(item.value) for item in [*at.error, *at.markdown, *at.text])
     assert "Message is empty." in page
 
 
-def test_product_page_shows_unreadable_manifest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("st_agent.ui.app.load_local_env", lambda: None)
+def test_product_page_shows_unreadable_manifest(tmp_path: Path) -> None:
     from streamlit.testing.v1 import AppTest
 
     case_root = create_case(tmp_path, "harbor-watch")
@@ -356,17 +478,14 @@ def test_product_page_shows_unreadable_manifest(
     script = Path(__file__).resolve().parents[1] / "app.py"
     at = AppTest.from_file(str(script), default_timeout=20)
     at.run()
-    at.text_input[2].input(str(case_root))
-    next(item for item in at.button if item.label == "Resume case").click().run()
+    _input_by_label(at, "Existing case folder").input(str(case_root))
+    _click(at, "Resume case")
     assert not at.exception
     page = "\n".join(str(item.value) for item in [*at.error, *at.markdown, *at.text])
     assert "case manifest is unreadable" in page
 
 
-def test_product_page_shows_unreadable_closed_readme(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("st_agent.ui.app.load_local_env", lambda: None)
+def test_product_page_shows_unreadable_closed_readme(tmp_path: Path) -> None:
     from streamlit.testing.v1 import AppTest
 
     case_root = create_case(tmp_path, "harbor-watch")
@@ -375,8 +494,8 @@ def test_product_page_shows_unreadable_closed_readme(
     script = Path(__file__).resolve().parents[1] / "app.py"
     at = AppTest.from_file(str(script), default_timeout=20)
     at.run()
-    at.text_input[2].input(str(case_root))
-    next(item for item in at.button if item.label == "Resume case").click().run()
+    _input_by_label(at, "Existing case folder").input(str(case_root))
+    _click(at, "Resume case")
     assert not at.exception
     page = "\n".join(str(item.value) for item in [*at.error, *at.markdown, *at.text])
     assert "case manifest is unreadable" in page

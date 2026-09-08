@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+import threading
 from pathlib import Path
 
 import streamlit as st
+from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
 
 from st_agent import __version__
 from st_agent.application.case_controller import submit_turn
-from st_agent.config import load_local_env, load_settings
+from st_agent.config import RuntimeSettings
 from st_agent.domain.case import CaseMode
 from st_agent.services.workspace import (
     ClosedCaseError,
@@ -31,6 +33,7 @@ from st_agent.ui.view import (
     preview_upload,
     read_deliverable,
     sanitize_events,
+    session_config_error,
     status_guidance,
     write_upload,
 )
@@ -47,6 +50,10 @@ def _ensure_state() -> None:
     st.session_state.setdefault("submit_n", 0)
     st.session_state.setdefault("error", "")
     st.session_state.setdefault("activity_lines", [])
+    st.session_state.setdefault("cfg_provider", "")
+    st.session_state.setdefault("cfg_base_url", "")
+    st.session_state.setdefault("cfg_model_id", "")
+    st.session_state.setdefault("cfg_api_key", "")
 
 
 def _open_case(path: Path) -> None:
@@ -59,6 +66,21 @@ def _open_case(path: Path) -> None:
     st.session_state.idempotent = False
     st.session_state.error = ""
     st.session_state.activity_lines = []
+
+
+def _connection_sidebar() -> None:
+    with st.sidebar:
+        st.subheader("OpenAI-compatible connection")
+        st.text_input("Provider", key="cfg_provider")
+        st.text_input("OpenAI Base URL", key="cfg_base_url")
+        st.text_input("Model", key="cfg_model_id")
+        st.text_input("API key", key="cfg_api_key", type="password")
+        st.caption(
+            "OpenAI-compatible Chat Completions only. Do not use an Anthropic URL."
+        )
+        st.caption(
+            "These values stay in this process and are discarded when the app stops."
+        )
 
 
 def _home() -> None:
@@ -189,6 +211,15 @@ def _submit(case_root: Path, message: str, uploads) -> None:
     if blocked:
         st.session_state.error = blocked
         return
+    cfg_err = session_config_error(
+        st.session_state.cfg_provider,
+        st.session_state.cfg_base_url,
+        st.session_state.cfg_model_id,
+        st.session_state.cfg_api_key,
+    )
+    if cfg_err:
+        st.session_state.error = cfg_err
+        return
     tmp: Path | None = None
     try:
         manifest = load_manifest(case_root)
@@ -202,13 +233,16 @@ def _submit(case_root: Path, message: str, uploads) -> None:
         started: set[str] = set()
         activity = [INITIAL_ACTIVITY]
         st.session_state.activity_lines = list(activity)
+        script_ctx = get_script_run_ctx()
 
         def sink(event: str) -> None:
             line = activity_label(event, started)
-            if line:
-                activity.append(line)
-                st.session_state.activity_lines = list(activity)
-                status.write(line)
+            if not line:
+                return
+            activity.append(line)
+            if script_ctx is not None:
+                add_script_run_ctx(threading.current_thread(), script_ctx)
+            status.write(line)
 
         with st.status(INITIAL_ACTIVITY, expanded=True) as status:
             with st.spinner(WORKING_SPINNER):
@@ -219,6 +253,12 @@ def _submit(case_root: Path, message: str, uploads) -> None:
                     operation_id=op_id,
                     expected_revision=manifest.revision,
                     event_sink=sink,
+                    live_settings=RuntimeSettings(
+                        provider=st.session_state.cfg_provider.strip(),
+                        base_url=st.session_state.cfg_base_url.strip(),
+                        model_id=st.session_state.cfg_model_id.strip(),
+                    ),
+                    live_key=st.session_state.cfg_api_key,
                 )
             if len(activity) == 1:
                 for event in events:
@@ -274,16 +314,20 @@ def _downloads(case_root: Path, *, closed: bool) -> None:
 
 
 def main() -> None:
-    load_local_env()
     st.set_page_config(page_title="ST-Agent", layout="centered")
     _ensure_state()
-    settings = load_settings()
+    _connection_sidebar()
+    provider = str(st.session_state.cfg_provider).strip()
+    model_id = str(st.session_state.cfg_model_id).strip()
     st.title("ST-Agent")
-    st.caption(f"Version {__version__} · Provider {settings.provider} · Model {settings.model_id}")
+    if provider and model_id:
+        st.caption(f"Version {__version__} · Provider {provider} · Model {model_id}")
+    else:
+        st.caption(f"Version {__version__} · Model connection is not configured")
     st.write(
-        "This app sends your English story material to B-AI to draft a SillyTavern "
-        "character card. Treat uploaded files and chat text as untrusted story content. "
-        "API keys stay in the environment."
+        "This app sends your English story material to a configured model provider "
+        "to draft a SillyTavern character card. Treat uploaded files and chat text "
+        "as untrusted story content."
     )
     if st.session_state.error:
         st.error(st.session_state.error)
