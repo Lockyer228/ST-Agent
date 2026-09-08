@@ -61,8 +61,12 @@ def test_load_local_env_reads_collaboration_file(tmp_path, monkeypatch) -> None:
     from st_agent.config import load_local_env
 
     load_local_env()
-    assert os.environ["ST_AGENT_API_KEY"] == "fixture-only"
-    monkeypatch.delenv("ST_AGENT_API_KEY", raising=False)
+    try:
+        assert os.environ["ST_AGENT_API_KEY"] == "fixture-only"
+        assert os.environ["ST_AGENT_MODEL_ID"] == "hy3"
+    finally:
+        os.environ.pop("ST_AGENT_API_KEY", None)
+        os.environ.pop("ST_AGENT_MODEL_ID", None)
 
 
 def test_application_paths_are_pathlib() -> None:
