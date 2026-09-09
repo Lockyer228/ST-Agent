@@ -1,5 +1,8 @@
 # ST-Agent
 
+[![CI](https://github.com/Lockyer228/ST-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Lockyer228/ST-Agent/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 ST-Agent is a local Windows Python application for independent role-play creators, interactive-fiction writers, and narrative designers. It turns an English story idea and optional source files into a SillyTavern Character Card, an optional PNG Character Card from a user-provided portrait, and a standalone and/or embedded Lorebook.
 
 This repository is the **product source**. Application paths use `pathlib` and avoid POSIX-only assumptions. Other operating systems are not promised without evidence.
