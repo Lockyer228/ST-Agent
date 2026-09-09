@@ -251,7 +251,7 @@ def _submit_locked(
             outcome = TurnOutcome(
                 kind="blocked",
                 message="No ST_AGENT_API_KEY in this environment.",
-                blocker="b-ai-credentials-missing",
+                blocker="provider-credentials-missing",
             )
         else:
             def _live_invoke(model_id: str) -> TurnOutcome:
@@ -279,7 +279,7 @@ def _submit_locked(
                     outcome = TurnOutcome(
                         kind="blocked",
                         message=last_error,
-                        blocker="b-ai-models-unavailable",
+                        blocker="provider-models-unavailable",
                     )
     else:
         prompt = user_prompt

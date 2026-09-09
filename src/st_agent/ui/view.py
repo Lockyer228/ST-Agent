@@ -45,10 +45,10 @@ _TOOL_FAILURE = {
 }
 
 _BLOCKER_HELP = {
-    "b-ai-credentials-missing": (
-        "B-AI credentials are missing. Set ST_AGENT_API_KEY in the environment and retry."
+    "provider-credentials-missing": (
+        "Model provider credentials are missing. Set ST_AGENT_API_KEY in the environment and retry."
     ),
-    "b-ai-models-unavailable": "The model provider is unavailable. Wait a moment and retry.",
+    "provider-models-unavailable": "The model provider is unavailable. Wait a moment and retry.",
     "live-timeout": (
         "The model stopped responding. Saved files were kept. Send again to continue."
     ),

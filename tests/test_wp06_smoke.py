@@ -1,4 +1,4 @@
-"""B-AI smoke case. Skipped when ST_AGENT_API_KEY is absent."""
+"""Live provider smoke case. Skipped when ST_AGENT_API_KEY is absent."""
 
 from __future__ import annotations
 

@@ -20,4 +20,4 @@ Recorded 2026-09-08.
 
 ## Self-contained runtime
 
-`load_local_env()` may read `project/Collaboration/b-ai-development-provider.env` when that sibling file exists. The package still runs from env vars and `.env` alone. No control-plane Python imports.
+`load_local_env()` may read `project/Collaboration/local-development-provider.env` when that sibling file exists. The package still runs from env vars and `.env` alone. No control-plane Python imports.

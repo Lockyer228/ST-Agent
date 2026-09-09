@@ -252,7 +252,7 @@ def test_send_is_paused_while_agent_working() -> None:
 
 
 def test_status_guidance_is_english_and_actionable() -> None:
-    text = status_guidance("blocked", "b-ai-credentials-missing", None)
+    text = status_guidance("blocked", "provider-credentials-missing", None)
     assert "ST_AGENT_API_KEY" in text
     assert "retry" in text.lower()
     waiting = status_guidance("waiting_for_user", None, "Please upload a portrait.")

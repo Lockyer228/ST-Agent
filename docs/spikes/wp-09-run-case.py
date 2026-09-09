@@ -23,8 +23,8 @@ LOG_PATH = Path(os.environ.get("ST_AGENT_WP09_LOG") or Path(__file__).with_name(
 WORKSPACE = Path(os.environ.get("TEMP") or os.environ.get("TMP") or "/tmp") / "st-agent-wp09-rc"
 MAX_TURNS = 8
 HARD_BLOCKERS = {
-    "b-ai-credentials-missing",
-    "b-ai-models-unavailable",
+    "provider-credentials-missing",
+    "provider-models-unavailable",
     "case-closed",
     "case-locked",
 }
@@ -89,7 +89,7 @@ def main() -> int:
     }
     if key is None:
         record["result"] = "pending-condition"
-        record["blocker"] = "b-ai-credentials-missing"
+        record["blocker"] = "provider-credentials-missing"
         LOG_PATH.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
         print("pending-condition: ST_AGENT_API_KEY is missing")
         return 2

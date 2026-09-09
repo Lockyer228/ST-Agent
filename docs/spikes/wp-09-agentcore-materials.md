@@ -6,7 +6,7 @@ This file prepares facts for a later user decision. It is not a go or no-go.
 
 - Single-process Windows Streamlit app
 - User-selected local case folders as the only recoverable task site
-- B-AI over an OpenAI-compatible API
+- A third-party model provider over an OpenAI-compatible API
 - Eight project-owned tools; no unrestricted filesystem, HTTP, or shell tools
 - No database, worker queue, custom API server, multi-agent graph, MCP server, or container platform
 

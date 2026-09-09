@@ -1,4 +1,4 @@
-"""WP-02 runtime spike helpers. Live B-AI is skipped when the API key is absent."""
+"""WP-02 runtime spike helpers. Live provider calls are skipped when the API key is absent."""
 
 from __future__ import annotations
 
@@ -128,14 +128,14 @@ def run_strands_spike(
     timeout_s: float | None = 90.0,
     cancel_signal: threading.Event | None = None,
 ) -> dict[str, str | bool | None | float]:
-    """Attempt one B-AI-backed invocation. Missing key is an explicit blocker."""
+    """Attempt one provider-backed invocation. Missing key is an explicit blocker."""
 
     probe = credential_probe()
     key = api_key()
     if not probe.available or key is None:
         return {
             "status": "blocked",
-            "code": "b-ai-credentials-missing",
+            "code": "provider-credentials-missing",
             "message": "No ST_AGENT_API_KEY in this environment.",
             "provider": probe.provider,
             "base_url": probe.base_url,
@@ -183,7 +183,7 @@ def run_strands_spike(
         }
     return {
         "status": "blocked",
-        "code": "b-ai-models-unavailable",
+        "code": "provider-models-unavailable",
         "message": last_error,
         "provider": probe.provider,
         "base_url": probe.base_url,
@@ -193,14 +193,14 @@ def run_strands_spike(
 
 
 def run_model_measurement() -> dict[str, str | bool | None | float]:
-    """S-04: one representative English case on the authorized B-AI model chain."""
+    """S-04: one representative English case on the authorized model chain."""
 
     probe = credential_probe()
     key = api_key()
     if not probe.available or key is None:
         return {
             "status": "blocked",
-            "code": "b-ai-credentials-missing",
+            "code": "provider-credentials-missing",
             "message": "No ST_AGENT_API_KEY in this environment.",
             "provider": probe.provider,
             "model_id": probe.model_id,
@@ -253,7 +253,7 @@ def run_model_measurement() -> dict[str, str | bool | None | float]:
         }
     return {
         "status": "blocked",
-        "code": "b-ai-models-unavailable",
+        "code": "provider-models-unavailable",
         "message": last_error,
         "provider": probe.provider,
         "model_id": probe.model_id,

@@ -1,6 +1,6 @@
 {
-  "provider": "B-AI",
-  "base_url": "https://api.b.ai/v1",
+  "provider": "openai-compatible",
+  "base_url": "https://api.example.com/v1",
   "preferred_model": "hy3",
   "key_present": true,
   "turns": [

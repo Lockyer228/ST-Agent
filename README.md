@@ -2,9 +2,7 @@
 
 ST-Agent is a local Windows Python application for independent role-play creators, interactive-fiction writers, and narrative designers. It turns an English story idea and optional source files into a SillyTavern Character Card, an optional PNG Character Card from a user-provided portrait, and a standalone and/or embedded Lorebook.
 
-This repository is the **product source**. Shared planning files live outside this Git tree.
-
-**Acceptance platform:** Windows. Application paths use `pathlib` and avoid POSIX-only assumptions. Other operating systems are not promised without evidence.
+This repository is the **product source**. Application paths use `pathlib` and avoid POSIX-only assumptions. Other operating systems are not promised without evidence.
 
 ## Target creator
 
@@ -14,7 +12,29 @@ The intended user is a single local creator who already writes in American Engli
 
 One Streamlit process owns the UI and the agent. The one-page UI (New / Resume / Send / downloads) calls `submit_turn` only. The case controller persists the user turn, runs a fresh Strands agent against the configured OpenAI-compatible provider, and binds eight tools: `save_brief`, `save_content_document`, `build_character_card`, `build_lorebook`, `build_png_card`, `check_official_sources`, `validate_deliverables`, and `finish_case`. Case state lives in the user-selected folder (`case.json`). File locks, atomic writes, crash `.tmp` files, and close/abandon hygiene recover work. Delivery is gated: a model text claim cannot skip missing or invalid artifacts.
 
-See `docs/TECHNICAL-ARCHITECTURE.md` for the system diagram.
+```mermaid
+flowchart LR
+    U[Creator] <--> Home[Streamlit home: New or Resume]
+    Home --> Case[Case page: Send / Resume / Abandon]
+    Case --> CC[case_controller.submit_turn]
+    CC --> AR[Strands Agent plus TurnOutcome]
+    AR <--> MP[OpenAI-compatible model provider]
+    AR <--> Tools[Eight bounded tools]
+    Tools --> WS[workspace service]
+    Tools --> CP[canonical content pipeline]
+    Tools --> FC[ST format and PNG codecs]
+    Tools --> OV[official source and validators]
+    CC --> WS
+    WS --> Rec[lock / atomic write / crash .tmp / close hygiene]
+    WS --> FS[(user-selected local case folder)]
+    OV --> OS[allowlisted official sources]
+    CP --> RR[English rule assets]
+    FC --> FS
+    Case --> DL[Downloads from README Deliverables]
+    FS --> DL
+```
+
+The full engineering baseline lives in `docs/TECHNICAL-ARCHITECTURE.md`.
 
 ## Requirements
 
@@ -52,12 +72,12 @@ Pinned versions used for this release candidate are recorded in `uv.lock`. Runti
 
 Interactive runs use the sidebar form: Provider, OpenAI Base URL, Model, and API key. Those values stay in the current process and are discarded when the app stops. The Streamlit UI does not read `.env` or collaboration env files.
 
-CLI, tests, and spike drivers such as `docs/spikes/wp-09-run-case.py` still load environment variables. Copy `.env.example` to `.env` for those local defaults. `.env` is gitignored. Development credentials are loaded from `project/Collaboration/b-ai-development-provider.env` when that file is present (outside this Git tree).
+CLI, tests, and spike drivers such as `docs/spikes/wp-09-run-case.py` still load environment variables. Copy `.env.example` to `.env` for those local defaults. `.env` is gitignored.
 
 | Variable | Purpose |
 | --- | --- |
-| `ST_AGENT_PROVIDER` | Development model provider for env/CLI. Default: `B-AI`. |
-| `ST_AGENT_BASE_URL` | OpenAI-compatible API base URL for env/CLI. Default: `https://api.b.ai/v1`. |
+| `ST_AGENT_PROVIDER` | Model provider label for env/CLI. Any OpenAI-compatible endpoint works. |
+| `ST_AGENT_BASE_URL` | OpenAI-compatible API base URL for env/CLI. |
 | `ST_AGENT_MODEL_ID` | Preferred model ID for env/CLI. The env/spike path uses the `AUTHORIZED_MODELS` allowlist (`deepseek-v4-flash-0731` in this package). The UI sidebar accepts any OpenAI-compatible `model_id` and base URL. |
 | `ST_AGENT_API_KEY` | Model API key for env/CLI. Local env only; never commit. |
 

@@ -8,7 +8,7 @@
     {
       "n": 1,
       "kind": "blocked",
-      "blocker": "b-ai-models-unavailable",
+      "blocker": "provider-models-unavailable",
       "required_input": null,
       "question": "",
       "message": "ValueError",
@@ -40,6 +40,6 @@
     "tool-failure:save_content_document:canonical-invalid",
     "invocation-complete"
   ],
-  "blocker": "b-ai-models-unavailable",
+  "blocker": "provider-models-unavailable",
   "story": "wp-09-case-input.md"
 }

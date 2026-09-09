@@ -5,14 +5,14 @@ absolute machine paths are omitted.
 
 ## Provider decision (2026-09-06)
 
-Development model provider is **B-AI** (OpenAI-compatible
-`https://api.b.ai/v1`) via the Strands `OpenAIModel` adapter. Authorized
+Development model provider is the development model provider (OpenAI-compatible
+`https://api.example.com/v1`) via the Strands `OpenAIModel` adapter. Authorized
 models, tried in order from the configured start: `hy3`, `mimo-v2.5`,
 `glm-5.3-flash`, `qwen3.8-flash`. The former `bedrock-credentials-missing`
 blocker is void. API key is read only from `ST_AGENT_API_KEY` (collaboration
 env file outside product Git).
 
-## S-01 Strands + B-AI
+## S-01 Strands + the model provider
 
 **Result: pass** on `hy3` (no fallback).
 
@@ -40,7 +40,7 @@ Streamlit "Run S-01 spike" calls the same `run_strands_spike()`.
 
 Known provider quirk (did not fail the spike): Strands logs
 `reasoningContent is not supported in multi-turn conversations with the Chat
-Completions API` on the B-AI Chat Completions path.
+Completions API` on the provider Chat Completions path.
 
 ## S-02 ST format and PNG
 
@@ -102,7 +102,7 @@ Quality: two-sentence NPC sketch stayed on the rain-soaked port / missing-ships
 ledger brief; natural American English. Tool reliability: one `ping_runtime`
 call and a valid `TurnOutcome`. Latency is acceptable for the local demo.
 
-Estimated demo cost: B-AI public API docs (`docs.b.ai` LLM service API) do not
+Estimated demo cost: the provider's public API docs do not
 publish a unit price. Token counts above are the measurable proxy; no key or
 account balance was logged.
 

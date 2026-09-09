@@ -1,4 +1,4 @@
-"""Environment configuration for the B-AI development model provider."""
+"""Environment configuration for the OpenAI-compatible model provider."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ from pathlib import Path
 
 from st_agent.paths import source_root
 
-DEFAULT_PROVIDER = "B-AI"
-DEFAULT_BASE_URL = "https://api.b.ai/v1"
+DEFAULT_PROVIDER = "openai-compatible"
+DEFAULT_BASE_URL = "https://api.example.com/v1"
 DEFAULT_MODEL_ID = "deepseek-v4-flash-0731"
 AUTHORIZED_MODELS = ("deepseek-v4-flash-0731",)
-_COLLAB_ENV = Path("project") / "Collaboration" / "b-ai-development-provider.env"
+_COLLAB_ENV = Path("project") / "Collaboration" / "local-development-provider.env"
 
 
 @dataclass(frozen=True)

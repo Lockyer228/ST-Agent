@@ -149,7 +149,7 @@ def test_missing_api_key_marks_manifest_blocked(
     monkeypatch.setattr("st_agent.application.case_controller.api_key", lambda: None)
     case_root = create_case(tmp_path, "harbor-watch")
     outcome, _ = submit_turn(case_root, "Hello.", operation_id="op-nokey")
-    assert outcome.blocker == "b-ai-credentials-missing"
+    assert outcome.blocker == "provider-credentials-missing"
     assert load_manifest(case_root).condition == Condition.blocked
 
 

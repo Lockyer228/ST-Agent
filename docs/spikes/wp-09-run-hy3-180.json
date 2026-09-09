@@ -1,10 +1,10 @@
 {
-  "provider": "B-AI",
+  "provider": "openai-compatible",
   "preferred_model": "hy3",
   "note": "LIVE_TIMEOUT_S=180. hy3 saved brief, then repeated canonical save failures. Chat Completions logged reasoningContent warnings. No exports. Secrets omitted.",
   "elapsed_s": 180.6,
   "result": "blocked",
-  "blocker": "b-ai-models-unavailable",
+  "blocker": "provider-models-unavailable",
   "exports": [],
   "events": [
     "tool-start:save_brief",

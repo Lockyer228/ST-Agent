@@ -36,7 +36,7 @@ Verdict: **usable**. Multi-tool Chat Completions loop completed. Authorized prod
 
 ## Notes
 
-- B-AI accepted tool-result follow-up messages on every model that reached a
+- the model provider accepted tool-result follow-up messages on every model that reached a
   second completion. `mimo-v2.5` failed on a later upstream call, not on the
   first tool round-trip.
 - `reasoningContent is not supported in multi-turn conversations with the Chat

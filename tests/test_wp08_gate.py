@@ -110,7 +110,7 @@ def test_tracked_files_have_no_cjk_secrets_or_instance_paths() -> None:
     listed = subprocess.check_output(["git", "ls-files"], cwd=root, text=True)
     names = [line.replace("\\", "/") for line in listed.splitlines() if line]
     assert "project/" not in "\n".join(names)
-    assert not any(name.endswith("b-ai-development-provider.env") for name in names)
+    assert not any(name.endswith("local-development-provider.env") for name in names)
     hits: list[str] = []
     for name in names:
         path = root / name

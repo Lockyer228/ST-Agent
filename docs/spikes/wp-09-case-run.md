@@ -22,7 +22,7 @@ Recorded 2026-09-08 on the Windows implementation host. No API keys.
 
 | Attempt | Model | Wall clock | Result | Tool events |
 | --- | --- | --- | --- | --- |
-| A | `hy3` (default) | 91.4s | blocked `b-ai-models-unavailable` (timeout) | `save_brief`, `save_content_document` start/success/failure |
+| A | `hy3` (default) | 91.4s | blocked `provider-models-unavailable` (timeout) | `save_brief`, `save_content_document` start/success/failure |
 | B | `glm-5.3-flash` | 90.6s | blocked timeout | `invocation-complete` only |
 | C | `hy3`, `LIVE_TIMEOUT_S=180` trial | 180.6s | blocked timeout | brief saved; repeated canonical `save_content_document` failures; Chat Completions `reasoningContent` warnings |
 | D | `hy3` plus canonical-continue | 367s | runner crash | turn 1 timeout; turn 2 `load_manifest` `WorkspaceError("case manifest is unreadable")` from trailing bytes on `case.json` |
@@ -31,7 +31,7 @@ Recorded 2026-09-08 on the Windows implementation host. No API keys.
 | G | `deepseek-v4-flash-0731`, first turn 25s | 83.5s | delivered | turn 1 `live-timeout`; turn 2 canned canonical continue through `finish_case` |
 
 JSON logs: `wp-09-run-hy3.json`, `wp-09-run-glm.json`, `wp-09-run-hy3-180.json`, `wp-09-run-retry.json`, `wp-09-run-deepseek-continue.json`, `wp-09-run-deepseek-nfr.json`.
-Provider probe: `wp-09-provider-probe.md` (B-AI) and `wp-09-provider-probe-deepseek.json`.
+Provider probe: `wp-09-provider-probe.md` (the model provider) and `wp-09-provider-probe-deepseek.json`.
 
 Copied closed-case files (no secrets): `wp-09-export-card.json`, `wp-09-export-lorebook.json`, `wp-09-export-card.png`, `wp-09-export-readme.md`.
 
@@ -51,6 +51,6 @@ Attempt E shows the real Strands sequence through `build_character_card`, `build
 
 ## Honest gap
 
-Attempt E produced live B-AI artifacts in 356.1s and the driver reported `blocked` because `finish_case` closed the case before TurnOutcome. The controller now treats `finish_ok` on a closed case as `delivered` (unit test). NFR-003 is measured on Attempt G, not Attempt E.
+Attempt E produced live the model provider artifacts in 356.1s and the driver reported `blocked` because `finish_case` closed the case before TurnOutcome. The controller now treats `finish_ok` on a closed case as `delivered` (unit test). NFR-003 is measured on Attempt G, not Attempt E.
 
 `enable_thinking: false` was added after Attempt G. That extra is unit-tested only.

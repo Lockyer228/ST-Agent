@@ -11,15 +11,15 @@ def test_package_imports() -> None:
 
 
 def test_settings_load_from_env(monkeypatch) -> None:
-    monkeypatch.setenv("ST_AGENT_PROVIDER", "B-AI")
-    monkeypatch.setenv("ST_AGENT_BASE_URL", "https://api.b.ai/v1")
+    monkeypatch.setenv("ST_AGENT_PROVIDER", "openai-compatible")
+    monkeypatch.setenv("ST_AGENT_BASE_URL", "https://api.example.com/v1")
     monkeypatch.setenv("ST_AGENT_MODEL_ID", "mimo-v2.5")
 
     from st_agent.config import load_settings
 
     settings = load_settings()
-    assert settings.provider == "B-AI"
-    assert settings.base_url == "https://api.b.ai/v1"
+    assert settings.provider == "openai-compatible"
+    assert settings.base_url == "https://api.example.com/v1"
     assert settings.model_id == "mimo-v2.5"
     assert not hasattr(settings, "api_key")
 
@@ -50,7 +50,7 @@ def test_authorized_model_chain_starts_with_preferred() -> None:
 def test_load_local_env_reads_collaboration_file(tmp_path, monkeypatch) -> None:
     collab = tmp_path / "project" / "Collaboration"
     collab.mkdir(parents=True)
-    (collab / "b-ai-development-provider.env").write_text(
+    (collab / "local-development-provider.env").write_text(
         "ST_AGENT_API_KEY=fixture-only\nST_AGENT_MODEL_ID=hy3\n",
         encoding="utf-8",
     )

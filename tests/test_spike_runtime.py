@@ -1,4 +1,4 @@
-"""S-01 wiring without claiming a live B-AI pass."""
+"""S-01 wiring without claiming a live provider pass."""
 
 from __future__ import annotations
 
@@ -38,14 +38,14 @@ def test_credential_probe_missing_key(monkeypatch) -> None:
 def test_api_key_counts_as_credentials(monkeypatch) -> None:
     monkeypatch.setattr("st_agent.spike.load_local_env", lambda: None)
     monkeypatch.setenv("ST_AGENT_API_KEY", "fixture-key-not-a-secret")
-    monkeypatch.setenv("ST_AGENT_PROVIDER", "B-AI")
-    monkeypatch.setenv("ST_AGENT_BASE_URL", "https://api.b.ai/v1")
+    monkeypatch.setenv("ST_AGENT_PROVIDER", "openai-compatible")
+    monkeypatch.setenv("ST_AGENT_BASE_URL", "https://api.example.com/v1")
     monkeypatch.setenv("ST_AGENT_MODEL_ID", "hy3")
 
     status = credential_probe()
     assert status.available is True
-    assert status.provider == "B-AI"
-    assert status.base_url == "https://api.b.ai/v1"
+    assert status.provider == "openai-compatible"
+    assert status.base_url == "https://api.example.com/v1"
     assert "fixture-key-not-a-secret" not in str(status)
 
 

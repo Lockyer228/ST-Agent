@@ -11,7 +11,7 @@ Recorded 2026-09-07.
 - Hook events shown: tool-start/success/failure, invocation-complete, idempotent. No prompts or reasoning.
 - Downloads read `04-exports/...` paths listed in the closed README. `read_deliverable` rejects `..` and any path outside `04-exports`.
 - `create_case(..., mode=modify)` stores `CaseMode.modify`. The first user turn still uploads the source card; overlay merge stays in WP-06 tools.
-- Page flow: Streamlit `AppTest` covers New / Send (injected `TurnOutcome`) / Resume without a live B-AI call. Live Send is a browser check.
+- Page flow: Streamlit `AppTest` covers New / Send (injected `TurnOutcome`) / Resume without a live provider call. Live Send is a browser check.
 
 ## Registered, not implemented
 

@@ -29,7 +29,7 @@ Recorded 2026-09-08. Rows are product-source tests unless noted.
 | BR-008 Imported prompt safety | pass | `wrap_user_content` in WP-06; `tests/test_wp08_gate.py` |
 | BR-009 Project-level ST tests | pass | frozen golden suite; not run per user case |
 | BR-010 American English | pass | hygiene scan; release README polish is WP-09 |
-| G-01 Runtime | pass (prior) | WP-02 B-AI S-01/S-04; smoke skips without key |
+| G-01 Runtime | pass (prior) | WP-02 provider S-01/S-04; smoke skips without key |
 | G-02 Format | pass (prior) | WP-02/WP-05 profiles |
 | G-03 Source | pass | official-source pass and unavailable |
 | G-04 Domain | pass | domain/workspace/canonical tests |
