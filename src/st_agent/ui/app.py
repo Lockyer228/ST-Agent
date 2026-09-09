@@ -23,7 +23,9 @@ from st_agent.services.workspace import (
     resume_case,
 )
 from st_agent.ui.view import (
+    AGENT_WORKING,
     INITIAL_ACTIVITY,
+    SEND_BUTTON_LABEL,
     WORKING_SPINNER,
     activity_label,
     activity_outcome_label,
@@ -54,6 +56,9 @@ def _ensure_state() -> None:
     st.session_state.setdefault("cfg_base_url", "")
     st.session_state.setdefault("cfg_model_id", "")
     st.session_state.setdefault("cfg_api_key", "")
+    st.session_state.setdefault("turn_form_n", 0)
+    st.session_state.setdefault("turn_busy", False)
+    st.session_state.setdefault("pending_turn", None)
 
 
 def _open_case(path: Path) -> None:
@@ -66,6 +71,9 @@ def _open_case(path: Path) -> None:
     st.session_state.idempotent = False
     st.session_state.error = ""
     st.session_state.activity_lines = []
+    st.session_state.turn_form_n = int(st.session_state.get("turn_form_n", 0)) + 1
+    st.session_state.turn_busy = False
+    st.session_state.pending_turn = None
 
 
 def _connection_sidebar() -> None:
@@ -168,17 +176,53 @@ def _case_page(case_root: Path) -> None:
         with st.expander("Technical activity"):
             st.text("\n".join(events))
 
+    busy = bool(st.session_state.turn_busy)
+    if busy:
+        st.info(AGENT_WORKING)
+
     if not closed:
-        with st.form("turn"):
-            message = st.text_area("Message")
-            uploads = st.file_uploader("Supported uploads", accept_multiple_files=True)
-            sent = st.form_submit_button("Send")
-        if sent:
-            _submit(case_root, message, uploads or [])
+        with st.form(f"turn-{st.session_state.turn_form_n}"):
+            message = st.text_area("Message", disabled=busy)
+            uploads = st.file_uploader(
+                "Supported uploads", accept_multiple_files=True, disabled=busy
+            )
+            sent = st.form_submit_button(SEND_BUTTON_LABEL, disabled=busy)
+        if sent and not busy:
+            files = list(uploads or [])
+            blocked = empty_turn_error(message, len(files))
+            if blocked:
+                st.session_state.error = blocked
+            else:
+                cfg_err = session_config_error(
+                    st.session_state.cfg_provider,
+                    st.session_state.cfg_base_url,
+                    st.session_state.cfg_model_id,
+                    st.session_state.cfg_api_key,
+                )
+                if cfg_err:
+                    st.session_state.error = cfg_err
+                else:
+                    st.session_state.pending_turn = {
+                        "message": message,
+                        "uploads": [(item.name, item.getvalue()) for item in files],
+                    }
+                    st.session_state.turn_busy = True
+            st.rerun()
+
+        pending = st.session_state.pending_turn
+        if busy and pending is not None:
+            st.session_state.pending_turn = None
+            packed = [_Upload(name, data) for name, data in pending["uploads"]]
+            try:
+                _submit(case_root, pending["message"], packed)
+            finally:
+                st.session_state.turn_busy = False
+            if not st.session_state.error:
+                st.session_state.turn_form_n += 1
             st.rerun()
 
     cols = st.columns(3)
-    if cols[0].button("Resume"):
+    if cols[0].button("Resume", disabled=busy):
         try:
             plan = resume_case(case_root)
             st.session_state.outcome_kind = ""
@@ -187,14 +231,14 @@ def _case_page(case_root: Path) -> None:
         except (OSError, WorkspaceError) as exc:
             st.session_state.error = str(exc)
             st.rerun()
-    if cols[1].button("Abandon") and not closed:
+    if cols[1].button("Abandon", disabled=busy) and not closed:
         try:
             abandon_case(case_root)
             st.rerun()
         except (OSError, WorkspaceError) as exc:
             st.session_state.error = str(exc)
             st.rerun()
-    if cols[2].button("New modification"):
+    if cols[2].button("New modification", disabled=busy):
         st.session_state.screen = "home"
         st.session_state.error = (
             "Create a modification case, then send the source character card "
@@ -203,6 +247,15 @@ def _case_page(case_root: Path) -> None:
         st.rerun()
 
     _downloads(case_root, closed=closed)
+
+
+class _Upload:
+    def __init__(self, name: str, data: bytes) -> None:
+        self.name = name
+        self._data = data
+
+    def getvalue(self) -> bytes:
+        return self._data
 
 
 def _submit(case_root: Path, message: str, uploads) -> None:

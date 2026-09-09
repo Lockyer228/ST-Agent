@@ -102,11 +102,13 @@ Limits: 10 files, 2 MiB per text file, 20 MiB per image, 16 megapixels, 50 MiB t
 
 ## Run
 
+Double-click `start-st-agent.cmd`. It starts the local Streamlit page in your browser. Close that window to stop the app. If the page is already running, the script only reopens `http://127.0.0.1:8501`.
+
+From a shell:
+
 ```text
 uv run streamlit run app.py
 ```
-
-The shell starts a local Streamlit page.
 
 1. Choose a workspace folder that is not inside this repository.
 2. **New**: enter a story name. Optionally check modify-mode if you will upload an existing card.
@@ -140,6 +142,7 @@ Approved architecture and project plan (C-029) are copied into `docs/` so this r
 
 ```text
 app.py                 Streamlit entry
+start-st-agent.cmd     Windows double-click launcher
 pyproject.toml         Python 3.12 project and exact tested lock (uv.lock)
 src/st_agent/          Importable runtime package
 src/st_agent/ui/       One-page Streamlit UI and Streamlit-free view helpers

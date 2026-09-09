@@ -13,7 +13,9 @@ from st_agent.domain.case import CaseMode
 from st_agent.services.readers import UnsupportedInput
 from st_agent.services.workspace import PathRejected, create_case, load_manifest
 from st_agent.ui.view import (
+    AGENT_WORKING,
     EVENT_PREFIXES,
+    SEND_BUTTON_LABEL,
     activity_label,
     empty_turn_error,
     next_operation_id,
@@ -243,6 +245,12 @@ def test_write_upload_keeps_basename_only(tmp_path: Path) -> None:
     assert fallback.read_bytes() == b"dots"
 
 
+def test_send_is_paused_while_agent_working() -> None:
+    assert SEND_BUTTON_LABEL == "Send message"
+    assert "working" in AGENT_WORKING.lower()
+    assert "sending" in AGENT_WORKING.lower()
+
+
 def test_status_guidance_is_english_and_actionable() -> None:
     text = status_guidance("blocked", "b-ai-credentials-missing", None)
     assert "ST_AGENT_API_KEY" in text
@@ -390,8 +398,9 @@ def test_product_page_creates_and_resumes_case(
     page = "\n".join(str(item.value) for item in [*at.markdown, *at.caption, *at.text])
     assert "setup" in page
     at.text_area[0].input("Make a JSON card.")
-    _click(at, "Send")
+    _click(at, SEND_BUTTON_LABEL)
     assert not at.exception
+    assert not (at.text_area[0].value or "").strip()
     page = "\n".join(str(item.value) for item in [*at.markdown, *at.text, *at.warning, *at.info])
     assert "Need a portrait file." in page or "Please upload a portrait." in page
     assert "Organizing the creative brief..." in page or "Waiting for your answer." in page
@@ -436,7 +445,7 @@ def test_product_page_send_needs_api_key(
     _fill_connection(at, api_key="")
     _click(at, "Create case")
     at.text_area[0].input("Make a JSON card.")
-    _click(at, "Send")
+    _click(at, SEND_BUTTON_LABEL)
     assert not at.exception
     assert calls == []
     page = "\n".join(str(item.value) for item in [*at.error, *at.markdown, *at.text])
@@ -463,11 +472,42 @@ def test_product_page_rejects_empty_send(
     _input_by_label(at, "Workspace folder").input(str(tmp_path))
     _input_by_label(at, "Story name").input("harbor-watch")
     _click(at, "Create case")
-    _click(at, "Send")
+    _click(at, SEND_BUTTON_LABEL)
     assert not at.exception
     assert calls == []
     page = "\n".join(str(item.value) for item in [*at.error, *at.markdown, *at.text])
     assert "Message is empty." in page
+
+
+def test_product_page_disables_send_while_agent_working(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from st_agent.outcomes import TurnOutcome
+
+    calls: list[int] = []
+
+    def fake_submit(*args, **kwargs):
+        calls.append(1)
+        return TurnOutcome(kind="question", message="should not run"), []
+
+    monkeypatch.setattr("st_agent.ui.app.submit_turn", fake_submit)
+    from streamlit.testing.v1 import AppTest
+
+    script = Path(__file__).resolve().parents[1] / "app.py"
+    at = AppTest.from_file(str(script), default_timeout=20)
+    at.run()
+    _input_by_label(at, "Workspace folder").input(str(tmp_path))
+    _input_by_label(at, "Story name").input("harbor-watch")
+    _fill_connection(at)
+    _click(at, "Create case")
+    at.session_state["turn_busy"] = True
+    at.run()
+    assert not at.exception
+    send = next(item for item in at.button if item.label == SEND_BUTTON_LABEL)
+    assert send.disabled
+    page = "\n".join(str(item.value) for item in [*at.info, *at.markdown, *at.text])
+    assert AGENT_WORKING in page
+    assert calls == []
 
 
 def test_product_page_shows_unreadable_manifest(tmp_path: Path) -> None:

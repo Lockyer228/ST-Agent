@@ -84,3 +84,16 @@ def test_streamlit_shell_module_imports() -> None:
     from st_agent.ui import app
 
     assert callable(app.main)
+
+
+def test_windows_start_script_runs_streamlit_from_checkout() -> None:
+    from st_agent.paths import source_root
+
+    path = source_root() / "start-st-agent.cmd"
+    assert path.is_file()
+    text = path.read_text(encoding="utf-8")
+    assert "cd /d \"%~dp0\"" in text
+    assert "streamlit run app.py" in text
+    assert "127.0.0.1:8501" in text
+    assert "ST_AGENT_API_KEY" not in text
+    assert "D:\\Projects" not in text

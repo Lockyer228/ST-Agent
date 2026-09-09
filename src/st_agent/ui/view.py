@@ -11,6 +11,8 @@ EVENT_PREFIXES = ("tool-start:", "tool-success:", "tool-failure:")
 _EXACT_EVENTS = frozenset({"invocation-complete", "idempotent"})
 INITIAL_ACTIVITY = "Reading your brief and deciding what the package needs..."
 WORKING_SPINNER = "Building your character package..."
+SEND_BUTTON_LABEL = "Send message"
+AGENT_WORKING = "The agent is working. Sending is paused until this turn finishes."
 _TOOL_RUNNING = {
     "save_brief": "Organizing the creative brief...",
     "save_content_document": "Drafting playable character content...",
