@@ -21,7 +21,8 @@ See `docs/TECHNICAL-ARCHITECTURE.md` for the system diagram.
 - Windows
 - Python 3.12 (`python3.12`; do not use a Microsoft Store `python` alias)
 - [uv](https://docs.astral.sh/uv/) 0.12 or later
-- A model API key in the environment (`ST_AGENT_API_KEY`)
+- For the Streamlit app: Provider, OpenAI Base URL, Model, and API key in the sidebar
+- For CLI or spike drivers: a model API key in the environment (`ST_AGENT_API_KEY`)
 
 ## Setup
 
@@ -49,14 +50,16 @@ Pinned versions used for this release candidate are recorded in `uv.lock`. Runti
 
 ## Configuration
 
-Copy `.env.example` to `.env` for local defaults. `.env` is gitignored. Development credentials are loaded from `project/Collaboration/b-ai-development-provider.env` when that file is present (outside this Git tree).
+Interactive runs use the sidebar form: Provider, OpenAI Base URL, Model, and API key. Those values stay in the current process and are discarded when the app stops. The Streamlit UI does not read `.env` or collaboration env files.
+
+CLI, tests, and spike drivers such as `docs/spikes/wp-09-run-case.py` still load environment variables. Copy `.env.example` to `.env` for those local defaults. `.env` is gitignored. Development credentials are loaded from `project/Collaboration/b-ai-development-provider.env` when that file is present (outside this Git tree).
 
 | Variable | Purpose |
 | --- | --- |
-| `ST_AGENT_PROVIDER` | Development model provider. Default: `B-AI`. Current live: `Alibaba-Token` via local env. |
-| `ST_AGENT_BASE_URL` | OpenAI-compatible API base URL. Default: `https://api.b.ai/v1`. |
-| `ST_AGENT_MODEL_ID` | Preferred model ID. Authorized chain (this package): `deepseek-v4-flash-0731` only. |
-| `ST_AGENT_API_KEY` | Model API key. Local env only; never commit. |
+| `ST_AGENT_PROVIDER` | Development model provider for env/CLI. Default: `B-AI`. |
+| `ST_AGENT_BASE_URL` | OpenAI-compatible API base URL for env/CLI. Default: `https://api.b.ai/v1`. |
+| `ST_AGENT_MODEL_ID` | Preferred model ID for env/CLI. The env/spike path uses the `AUTHORIZED_MODELS` allowlist (`deepseek-v4-flash-0731` in this package). The UI sidebar accepts any OpenAI-compatible `model_id` and base URL. |
+| `ST_AGENT_API_KEY` | Model API key for env/CLI. Local env only; never commit. |
 
 Do not commit `.env`, API keys, or session tokens. Do not put secrets in case files, logs, or generated artifacts.
 
@@ -96,7 +99,7 @@ Limits: 10 files, 2 MiB per text file, 20 MiB per image, 16 megapixels, 50 MiB t
 - Local single-user Windows demo. No accounts, no multi-case cloud memory, no AgentCore deployment in this package.
 - American English product and generated text. CJK in product files is out of scope.
 - PNG delivery requires a user-provided portrait. The app does not invent an image.
-- One live model invocation is bounded (about 90 seconds per authorized model). This package authorizes only `deepseek-v4-flash-0731`. Long jobs continue with Resume / another Send.
+- HTTP connect/write/pool timeouts (15/60/15s) cover unreachable providers; a live turn has no total duration cap. Env and spike paths use the `AUTHORIZED_MODELS` allowlist; the UI sidebar accepts any OpenAI-compatible `model_id` and base URL. Long jobs continue with Resume / another Send.
 - Official format checks use a small allowlisted URL set. A source change blocks delivery until the local profile is updated.
 - Ordinary user cases are not imported into SillyTavern as a project gate. Frozen golden fixtures in `tests/fixtures/golden` are the project-level format suite.
 

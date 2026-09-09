@@ -38,6 +38,8 @@ def test_is_confirm_reply_accepts_short_yes() -> None:
     assert is_confirm_reply("yes")
     assert is_confirm_reply("Yes.")
     assert is_confirm_reply("confirm")
+    assert is_confirm_reply("yes\u3002")
+    assert is_confirm_reply("yes\uFF01")
     assert not is_confirm_reply("yes, and also add a dragon")
     assert not is_confirm_reply("Make a JSON card.")
 

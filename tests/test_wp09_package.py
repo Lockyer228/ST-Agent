@@ -121,6 +121,19 @@ def test_brief_then_builds_can_finish(tmp_path: Path) -> None:
     assert done["ok"] is True
 
 
+def test_save_brief_adversarial_fields_return_canonical_invalid(tmp_path: Path) -> None:
+    case_root = _authorized_case(tmp_path)
+    ctx = ToolContext(case_root=case_root, invocation_id="inv-adv", operation_id="op-adv")
+    tools = {item.tool_name: item._tool_func for item in bind_tools(ctx)}
+    result = tools["save_brief"](
+        **{**BRIEF_ARGS, "characters": "Mara keeps the tavern.\n---\nShe records lost ships."}
+    )
+    assert result["ok"] is False
+    assert result["code"] == "canonical-invalid"
+    assert (case_root / "00-work" / "brief.md").is_file()
+    assert not (case_root / "03-final-text" / "canonical.md").is_file()
+
+
 def test_invalid_canonical_save_keeps_auto_file(tmp_path: Path) -> None:
     case_root = _authorized_case(tmp_path)
     ctx = ToolContext(case_root=case_root, invocation_id="inv-keep", operation_id="op-keep")

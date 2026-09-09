@@ -6,7 +6,7 @@ Recorded 2026-09-08. Live artifact set exists. Three-minute target met on Alibab
 | --- | --- | --- |
 | NFR-001 English | pass | README and spike notes are American English; hygiene scan |
 | NFR-002 Reliability | pass | WP-08 matrix; `load_manifest` recovers trailing bytes / `.bak`; per-model live timeout |
-| NFR-003 Time and cost | pass | Alibaba-Token `deepseek-v4-flash-0731` delivered in 83.5s (`wp-09-run-deepseek-nfr.json`) |
+| NFR-003 Time and cost | pass (historical) | 83.5s on Alibaba-Token `deepseek-v4-flash-0731` (`wp-09-run-deepseek-nfr.json`, `e96bfb4`). Since `5e7cfe7` a live turn has no structural duration cap. |
 | NFR-004 Data and security | pass (prior) | WP-08; live logs omit keys |
 | NFR-005 Visible autonomy | pass | Live `build_*` / `check_official_sources` / `validate_deliverables` / `finish_case` in `wp-09-run-retry.json` |
 | G-07 README | pass | Product README: purpose, target creator, architecture, setup, credentials, inputs, data, limits, run, test |

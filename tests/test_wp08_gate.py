@@ -16,7 +16,7 @@ from st_agent.paths import package_dir, source_root
 from st_agent.services.validators import validate_card
 from st_agent.services.workspace import create_case, load_manifest, resume_case, save_manifest
 
-HAN = re.compile(r"[\u3400-\u9fff]")
+CJK = re.compile(r"[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]")
 SECRET_ASSIGN = re.compile(r"ST_AGENT_API_KEY\s*=\s*\S+")
 INSTANCE = re.compile(
     r"ST-CURSOR-IMPL|ST-CODEX-LEAD|ST-CLAUDE-REVIEW|D:\\\\Projects\\\\ST-Agent|Y:\\\\Vault"
@@ -97,6 +97,14 @@ def test_lockfile_pins_demo_versions() -> None:
     assert 'requires-python = ">=3.12,<3.13"' in requires
 
 
+def test_cjk_scan_covers_fullwidth_punctuation() -> None:
+    assert CJK.search("\u3002") is not None
+    assert CJK.search("\uFF01") is not None
+    assert CJK.search("\uFF0C") is not None
+    assert CJK.search("\u4e00") is not None
+    assert CJK.search("ascii") is None
+
+
 def test_tracked_files_have_no_cjk_secrets_or_instance_paths() -> None:
     root = source_root()
     listed = subprocess.check_output(["git", "ls-files"], cwd=root, text=True)
@@ -114,7 +122,7 @@ def test_tracked_files_have_no_cjk_secrets_or_instance_paths() -> None:
         if b"\x00" in data:
             continue
         text = data.decode("utf-8")
-        if HAN.search(text):
+        if CJK.search(text):
             hits.append(f"han:{name}")
         if SECRET_ASSIGN.search(text) and "fixture-only" not in text:
             if re.search(r"ST_AGENT_API_KEY\s*=\s*['\"]?[A-Za-z0-9_\-]{8,}", text):

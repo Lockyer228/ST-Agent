@@ -296,7 +296,10 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
         path = contained_path(case_root, WORK_DIR, "brief.md")
         atomic_write(path, _brief_markdown(brief))
         canonical = _canonical_path(case_root)
-        auto = roundtrip(document_from_brief(brief))
+        try:
+            auto = roundtrip(document_from_brief(brief))
+        except CanonicalError as exc:
+            return envelope(ok=False, code="canonical-invalid", message=str(exc))
         atomic_write(canonical, render_canonical(auto))
         manifest, err = _advance(
             case_root, Phase.intake, Phase.draft, operation_id=ctx.next_op("save_brief")

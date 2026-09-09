@@ -293,13 +293,13 @@ def _name_from_characters(characters: str) -> str:
     if not text:
         return "Character"
     line = text.splitlines()[0].strip()
-    for sep in ("：", ":"):
+    for sep in ("\uFF1A", ":"):
         if sep in line:
             left, right = (part.strip() for part in line.split(sep, 1))
             line = right if len(left) <= 4 else left
             break
-    clause = re.split(r"[.。;；!！?？]", line, maxsplit=1)[0]
-    clause = re.split(r"[,，]", clause, maxsplit=1)[0].strip()
+    clause = re.split("[.\u3002;\uFF1B!\uFF01?\uFF1F]", line, maxsplit=1)[0]
+    clause = re.split("[,\uFF0C]", clause, maxsplit=1)[0].strip()
     taken: list[str] = []
     for word in clause.split():
         token = word.strip("\"'")
@@ -312,10 +312,10 @@ def _name_from_characters(characters: str) -> str:
 
 
 def _keys(text: str, fallback: str) -> list[str]:
-    cleaned = text.replace(",", " ").replace("，", " ")
+    cleaned = text.replace(",", " ").replace("\uFF0C", " ")
     keys: list[str] = []
     for word in cleaned.split():
-        token = word.strip(".,;:。")[:40]
+        token = word.strip(".,;:\u3002")[:40]
         if len(token) < 2 or "," in token or token in keys:
             continue
         keys.append(token)

@@ -39,7 +39,7 @@ Attempt E checks: `validate_card` issues empty; PNG `ccv3` reads Mara Ellison wi
 
 ## NFR-003
 
-Attempt G delivered the expected export set in **83.5s** (`wp-09-run-deepseek-nfr.json`): PNG card, standalone lorebook, embedded lorebook, closed-case README. First Send used a 25s live budget; the continue turn injected the known-good canonical from `wp-09-canonical.md`. That is under the three-minute target.
+Attempt G delivered the expected export set in **83.5s** (`wp-09-run-deepseek-nfr.json`, recorded at `e96bfb4`): PNG card, standalone lorebook, embedded lorebook, closed-case README. That is a historical measurement, not a structural guarantee. Since `5e7cfe7` a live turn has no total duration cap; HTTP connect/write/pool timeouts (15/60/15s) still cover unreachable providers.
 
 ## NFR-005
 

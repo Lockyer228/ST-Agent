@@ -43,7 +43,7 @@ _CONFIRM_REPLIES = frozenset(
 
 def is_confirm_reply(message: str) -> bool:
     text = message.strip().lower()
-    text = text.replace("。", "").replace("！", "")
+    text = text.replace("\u3002", "").replace("\uFF01", "")
     text = text.rstrip(".!")
     text = " ".join(text.split())
     return text in _CONFIRM_REPLIES
