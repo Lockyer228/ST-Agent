@@ -9,6 +9,7 @@ Sources (permission: project reference, not copied private prose):
 # Q&A method
 
 Ask only what is still missing. Existing answers, uploads, and corrections stay in force.
+Do not ask the user to paste the rest of a story already stored in intake. An omitted-marker clip is a context limit, not a cutoff.
 
 ## One question
 

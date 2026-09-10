@@ -23,6 +23,7 @@ from st_agent.services.workspace import (
     compact_context,
     contained_path,
     create_case,
+    export_path,
     load_manifest,
     resume_case,
     save_manifest,
@@ -207,6 +208,35 @@ def test_compact_context_reads_real_files(tmp_path: Path) -> None:
     assert ctx["delivery"] == "json"
     assert "hello" in ctx["intake"]
     assert isinstance(ctx["files"], list)
+
+
+def test_compact_context_keeps_intake_past_800_chars(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    story = "User: During thunderstorms, KXRD. June has spent years explaining this. " * 20
+    assert len(story) > 800
+    atomic_write(case_root / "00-work" / "intake.md", story)
+    ctx = compact_context(case_root)
+    assert ctx["intake"] == story
+    assert "omitted" not in ctx["intake"]
+
+
+def test_compact_context_marks_omitted_intake(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "harbor-watch")
+    story = "START-" + ("m" * 400) + "-MIDDLE-" + ("n" * 400) + "-END"
+    atomic_write(case_root / "00-work" / "intake.md", story)
+    ctx = compact_context(case_root, max_chars=180)
+    assert ctx["intake"].startswith("START-")
+    assert ctx["intake"].endswith("-END")
+    assert "characters omitted" in ctx["intake"]
+    assert "-MIDDLE-" not in ctx["intake"]
+
+
+def test_export_path_uses_case_folder_name(tmp_path: Path) -> None:
+    case_root = create_case(tmp_path, "Dead Air On County Road 17")
+    assert case_root.name == "dead-air-on-county-road-17"
+    assert export_path(case_root, "json").name == "dead-air-on-county-road-17.json"
+    assert export_path(case_root, "png").name == "dead-air-on-county-road-17.png"
+    assert export_path(case_root, "lorebook").name == "dead-air-on-county-road-17-lorebook.json"
 
 
 def test_intake_qa_survives_new_uploads(tmp_path: Path) -> None:

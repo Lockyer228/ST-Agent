@@ -135,11 +135,11 @@ def test_fake_model_completes_json_delivery(tmp_path: Path) -> None:
     assert any(item.startswith("tool-start:save_brief") for item in events)
     assert any(item.startswith("tool-start:finish_case") for item in events)
     assert "invocation-complete" in events
-    assert (case_root / "04-exports" / "character-cards" / "card.json").is_file()
+    assert (case_root / "04-exports" / "character-cards" / "harbor-watch.json").is_file()
     assert not (case_root / "00-work").exists()
     readme = (case_root / "README.md").read_text(encoding="utf-8")
     assert "closed" in readme.lower()
-    assert "04-exports/character-cards/card.json" in readme
+    assert "04-exports/character-cards/harbor-watch.json" in readme
 
 
 def test_duplicate_operation_is_idempotent(tmp_path: Path) -> None:

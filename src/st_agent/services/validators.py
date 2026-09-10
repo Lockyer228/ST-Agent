@@ -92,20 +92,31 @@ def validate_lorebook(book: dict[str, Any], *, embedded: bool) -> ValidationResu
     return _result(*issues)
 
 
+def _artifact_role(name: str) -> str:
+    base = Path(name).name.lower()
+    if base.endswith(".png"):
+        return "png"
+    if "lorebook" in base:
+        return "lorebook"
+    if base.endswith(".json"):
+        return "json"
+    return "other"
+
+
 def validate_requested_output(
     prefs: DeliveryPreferences, artifacts: dict[str, bytes]
 ) -> ValidationResult:
     issues: list[RepairableIssue] = []
-    names = set(artifacts)
-    if prefs.character in {CardDelivery.json, CardDelivery.both} and "card.json" not in names:
+    roles = {_artifact_role(name) for name in artifacts}
+    if prefs.character in {CardDelivery.json, CardDelivery.both} and "json" not in roles:
         issues.append(RepairableIssue("output-json", "JSON card was requested but not built"))
-    if prefs.character in {CardDelivery.png, CardDelivery.both} and "card.png" not in names:
+    if prefs.character in {CardDelivery.png, CardDelivery.both} and "png" not in roles:
         issues.append(RepairableIssue("output-png", "PNG card was requested but not built"))
     if prefs.lorebook in {LorebookDelivery.standalone, LorebookDelivery.both}:
-        if "lorebook.json" not in names:
+        if "lorebook" not in roles:
             issues.append(RepairableIssue("output-lorebook", "standalone lorebook was not built"))
     if prefs.lorebook in {LorebookDelivery.embedded, LorebookDelivery.both}:
-        if "card.json" not in names and "card.png" not in names:
+        if "json" not in roles and "png" not in roles:
             issues.append(RepairableIssue("output-embedded", "embedded lorebook needs a card"))
     return _result(*issues)
 
@@ -131,9 +142,10 @@ def validate_png(png: bytes, card: dict[str, Any]) -> ValidationResult:
 
 
 def _export_dir(case_root: Path, name: str) -> Path:
-    if name.endswith(".png"):
+    base = name.lower()
+    if base.endswith(".png"):
         folder = "png-cards"
-    elif name.startswith("lorebook"):
+    elif "lorebook" in base:
         folder = "lorebooks"
     else:
         folder = "character-cards"

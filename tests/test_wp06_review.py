@@ -121,10 +121,10 @@ def test_repair_loop_after_official_check_rewrites_lineage(tmp_path: Path) -> No
         source_service=_source_service(),
     )
     assert outcome.kind == "delivered"
-    card = case_root / "04-exports" / "character-cards" / "card.json"
+    card = case_root / "04-exports" / "character-cards" / "harbor-watch.json"
     assert "Mara sets a mug down" in card.read_text(encoding="utf-8")
     readme = (case_root / "README.md").read_text(encoding="utf-8")
-    assert "04-exports/character-cards/card.json" in readme
+    assert "04-exports/character-cards/harbor-watch.json" in readme
 
 
 def test_closed_readme_lists_deliverables(tmp_path: Path) -> None:
@@ -138,7 +138,7 @@ def test_closed_readme_lists_deliverables(tmp_path: Path) -> None:
     )
     assert outcome.kind == "delivered"
     text = (case_root / "README.md").read_text(encoding="utf-8")
-    assert "04-exports/character-cards/card.json" in text
+    assert "04-exports/character-cards/harbor-watch.json" in text
     assert "will be listed here" not in text
 
 
@@ -245,10 +245,10 @@ def test_cleanup_failure_leaves_cleanup_pending(
 
     monkeypatch.setattr(workspace, "_remove_work", boom)
     case_root = create_case(tmp_path, "harbor-watch")
-    close_case(case_root, deliverables=["04-exports/character-cards/card.json"])
+    close_case(case_root, deliverables=["04-exports/character-cards/harbor-watch.json"])
     manifest = load_manifest(case_root)
     assert manifest.condition == Condition.cleanup_pending
-    assert "04-exports/character-cards/card.json" in (case_root / "README.md").read_text(
+    assert "04-exports/character-cards/harbor-watch.json" in (case_root / "README.md").read_text(
         encoding="utf-8"
     )
 
@@ -300,6 +300,6 @@ def test_lineage_hash_matches_export_after_rebuild(tmp_path: Path) -> None:
     _fn(ctx, "save_content_document")(kind="canonical", markdown=_canonical_markdown())
     _fn(ctx, "build_character_card")()
     manifest = load_manifest(case_root)
-    card = case_root / "04-exports" / "character-cards" / "card.json"
+    card = case_root / "04-exports" / "character-cards" / "harbor-watch.json"
     assert manifest.lineage["character"].stale is False
     assert manifest.lineage["character"].artifact_hash == file_sha256(card)

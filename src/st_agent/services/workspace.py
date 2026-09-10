@@ -42,6 +42,8 @@ LAYOUT = (
     f"{EXPORTS_DIR}/png-cards",
 )
 MAX_TEXT_BYTES = 2 * 1024 * 1024
+CONTEXT_SNIPPET_CHARS = 32_000
+_OMITTED = "\n[... {n} characters omitted ...]\n"
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_PIXELS = 16_000_000
 MAX_FILES = 10
@@ -94,6 +96,24 @@ class ResumePlan:
 def slugify(name: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
     return slug or "story"
+
+
+def export_stem(case_root: Path) -> str:
+    return slugify(case_root.name)
+
+
+def export_filename(kind: str, stem: str) -> str:
+    if kind == "png":
+        return f"{stem}.png"
+    if kind == "lorebook":
+        return f"{stem}-lorebook.json"
+    return f"{stem}.json"
+
+
+def export_path(case_root: Path, kind: str) -> Path:
+    name = export_filename(kind, export_stem(case_root))
+    folder = {"json": "character-cards", "png": "png-cards", "lorebook": "lorebooks"}[kind]
+    return case_root / EXPORTS_DIR / folder / name
 
 
 def canonicalize_root(path: Path) -> Path:
@@ -419,7 +439,20 @@ def append_intake(case_root: Path, text: str) -> None:
     atomic_write(path, current + addition)
 
 
-def compact_context(case_root: Path, max_chars: int = 800) -> dict[str, object]:
+def _clip_text(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    reserve = len(_OMITTED.format(n=len(text)))
+    keep = max(max_chars - reserve, 0)
+    if keep < 64:
+        return text[:max_chars]
+    head = keep * 3 // 4
+    tail = keep - head
+    omitted = len(text) - head - tail
+    return f"{text[:head]}{_OMITTED.format(n=omitted)}{text[-tail:]}"
+
+
+def compact_context(case_root: Path, max_chars: int = CONTEXT_SNIPPET_CHARS) -> dict[str, object]:
     manifest = load_manifest(case_root)
     work = case_root / WORK_DIR
 
@@ -427,7 +460,7 @@ def compact_context(case_root: Path, max_chars: int = 800) -> dict[str, object]:
         path = work / name
         if not path.is_file():
             return ""
-        return path.read_text(encoding="utf-8")[:max_chars]
+        return _clip_text(path.read_text(encoding="utf-8"), max_chars)
 
     files = []
     for path in sorted(case_root.rglob("*")):

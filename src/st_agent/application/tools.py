@@ -65,6 +65,9 @@ from st_agent.services.workspace import (
     atomic_write,
     close_case,
     contained_path,
+    export_filename,
+    export_path,
+    export_stem,
     file_sha256,
     load_manifest,
     save_manifest,
@@ -462,7 +465,7 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
         except FormatError as exc:
             return envelope(ok=False, code="format-error", message=str(exc))
         payload = json.dumps(card, ensure_ascii=False, indent=2).encode("utf-8")
-        staged = {"card.json": payload}
+        staged = {export_filename("json", export_stem(case_root)): payload}
         result = validate_card(card)
         exported = promote_exports(case_root, staged, result)
         if not result.ok:
@@ -526,7 +529,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             return envelope(ok=False, code="format-error", message=str(exc))
         payload = json.dumps(book, ensure_ascii=False, indent=2).encode("utf-8")
         result = validate_lorebook(book, embedded=False)
-        exported = promote_exports(case_root, {"lorebook.json": payload}, result)
+        exported = promote_exports(
+            case_root, {export_filename("lorebook", export_stem(case_root)): payload}, result
+        )
         if not result.ok:
             ctx.format_repairs += 1
             return envelope(ok=False, code="validation-failed", issues=result.issues)
@@ -572,7 +577,7 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             return envelope(ok=True, message="no PNG card requested", revision=manifest.revision)
         if manifest.phase not in BUILD_PHASES:
             return _phase_error(manifest.phase, Phase.build)
-        card_path = case_root / "04-exports" / "character-cards" / "card.json"
+        card_path = export_path(case_root, "json")
         if not card_path.is_file():
             return envelope(ok=False, code="missing-card", message="JSON card must be built first")
         card = json.loads(card_path.read_text(encoding="utf-8"))
@@ -583,7 +588,9 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             )
         png = PngCardCodec().write(Image.open(portrait), card)
         result = validate_png(png, card)
-        exported = promote_exports(case_root, {"card.png": png}, result)
+        exported = promote_exports(
+            case_root, {export_filename("png", export_stem(case_root)): png}, result
+        )
         if not result.ok:
             ctx.format_repairs += 1
             return envelope(ok=False, code="validation-failed", issues=result.issues)
@@ -744,16 +751,10 @@ def _portrait_path(case_root: Path, doc: CanonicalDocument) -> Path | None:
 
 def _export_bytes(case_root: Path) -> dict[str, bytes]:
     artifacts: dict[str, bytes] = {}
-    exports = case_root / "04-exports"
-    mapping = {
-        "character-cards/card.json": "card.json",
-        "png-cards/card.png": "card.png",
-        "lorebooks/lorebook.json": "lorebook.json",
-    }
-    for rel, name in mapping.items():
-        path = exports / rel
+    for kind in ("json", "png", "lorebook"):
+        path = export_path(case_root, kind)
         if path.is_file():
-            artifacts[name] = path.read_bytes()
+            artifacts[path.name] = path.read_bytes()
     return artifacts
 
 
@@ -775,17 +776,17 @@ def run_delivery_checks(case_root: Path) -> ValidationResult:
             issues.append(
                 RepairableIssue("source-evidence", "official source evidence is not current")
             )
-    card_path = case_root / "04-exports" / "character-cards" / "card.json"
+    card_path = export_path(case_root, "json")
     if card_path.is_file():
         issues.extend(validate_card(json.loads(card_path.read_text(encoding="utf-8"))).issues)
-    lore_path = case_root / "04-exports" / "lorebooks" / "lorebook.json"
+    lore_path = export_path(case_root, "lorebook")
     if lore_path.is_file():
         issues.extend(
             validate_lorebook(
                 json.loads(lore_path.read_text(encoding="utf-8")), embedded=False
             ).issues
         )
-    png_path = case_root / "04-exports" / "png-cards" / "card.png"
+    png_path = export_path(case_root, "png")
     if png_path.is_file() and card_path.is_file():
         issues.extend(
             validate_png(

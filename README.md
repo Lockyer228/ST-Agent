@@ -112,7 +112,7 @@ Limits: 10 files, 2 MiB per text file, 20 MiB per image, 16 megapixels, 50 MiB t
 - Case files live in a user-chosen workspace folder. The app does not overwrite user originals.
 - Do not place a user workspace inside the application source tree.
 - Case folders use the English layout `00-work/` through `04-exports/`. `00-work/case.json` is the recoverable state; `status.md` is generated from it.
-- Exports land under `04-exports/character-cards/card.json`, `04-exports/png-cards/card.png`, and `04-exports/lorebooks/lorebook.json` when those deliveries were requested and validated.
+- Exports use the case folder name, for example `04-exports/character-cards/harbor-watch.json`, `04-exports/png-cards/harbor-watch.png`, and `04-exports/lorebooks/harbor-watch-lorebook.json` when those deliveries were requested and validated.
 - Closed-case downloads follow the `Deliverables:` list in the case `README.md`. Paths outside `04-exports/` are rejected.
 - Close and abandon remove temporary work files. Deliverables stay on disk.
 - Debug logs must not include prompt bodies, uploaded content, credentials, or hidden reasoning.

@@ -98,7 +98,9 @@ def test_save_brief_writes_importable_canonical(tmp_path: Path) -> None:
     assert validate_card(card).ok
     built = tools["build_character_card"]()
     assert built["ok"] is True
-    payload = json.loads((case_root / "04-exports" / "character-cards" / "card.json").read_text())
+    payload = json.loads(
+        (case_root / "04-exports" / "character-cards" / "harbor-watch.json").read_text()
+    )
     assert payload["data"]["name"].strip()
 
 
@@ -275,4 +277,4 @@ def test_finish_ok_reports_delivered_if_model_says_blocked(tmp_path: Path) -> No
         source_service=_source_service(),
     )
     assert outcome.kind == "delivered"
-    assert (case_root / "04-exports" / "character-cards" / "card.json").is_file()
+    assert (case_root / "04-exports" / "character-cards" / "harbor-watch.json").is_file()

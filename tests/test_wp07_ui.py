@@ -184,11 +184,11 @@ def test_event_sink_exception_does_not_fail_turn(tmp_path: Path) -> None:
 def test_parse_deliverables_ignores_escape() -> None:
     text = (
         "# harbor-watch\n\nCase state: closed.\n\nDeliverables:\n"
-        "- 04-exports/character-cards/card.json\n"
+        "- 04-exports/character-cards/harbor-watch.json\n"
         "- ../../secret.txt\n"
         "- 00-work/brief.md\n"
     )
-    assert parse_deliverables(text) == ["04-exports/character-cards/card.json"]
+    assert parse_deliverables(text) == ["04-exports/character-cards/harbor-watch.json"]
 
 
 def test_list_readme_deliverables_ignores_non_utf8(tmp_path: Path) -> None:
@@ -204,8 +204,8 @@ def test_read_deliverable_returns_exact_bytes(tmp_path: Path) -> None:
     dest = case_root / "04-exports" / "character-cards"
     dest.mkdir(parents=True, exist_ok=True)
     payload = b'{"spec":"chara_card_v3"}'
-    (dest / "card.json").write_bytes(payload)
-    assert read_deliverable(case_root, "04-exports/character-cards/card.json") == payload
+    (dest / "harbor-watch.json").write_bytes(payload)
+    assert read_deliverable(case_root, "04-exports/character-cards/harbor-watch.json") == payload
 
 
 def test_read_deliverable_rejects_work_dir(tmp_path: Path) -> None:

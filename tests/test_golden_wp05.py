@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from st_agent.domain.case import CardDelivery
+from st_agent.domain.case import CardDelivery, LorebookDelivery
 from st_agent.domain.content import (
     CharacterContent,
     DeliveryPreferences,
@@ -119,6 +119,27 @@ def test_json_only_png_only_and_json_plus_png(tmp_path: Path) -> None:
     assert len(exported) == 2
     assert (case_root / "04-exports" / "character-cards" / "card.json").is_file()
     assert (case_root / "04-exports" / "png-cards" / "card.png").is_file()
+
+
+def test_story_named_exports_and_lorebook_folder(tmp_path: Path) -> None:
+    png = PngCardCodec().write(Image.new("RGB", (8, 8), "navy"), serialize_character(_character()))
+    case_root = create_case(tmp_path, "Dead Air On County Road 17")
+    stem = "dead-air-on-county-road-17"
+    staged = {
+        f"{stem}.json": b"{}",
+        f"{stem}.png": png,
+        f"{stem}-lorebook.json": b"{}",
+    }
+    both = validate_requested_output(
+        DeliveryPreferences(character=CardDelivery.both, lorebook=LorebookDelivery.standalone),
+        staged,
+    )
+    assert both.ok
+    exported = promote_exports(case_root, staged, both)
+    assert len(exported) == 3
+    assert (case_root / "04-exports" / "character-cards" / f"{stem}.json").is_file()
+    assert (case_root / "04-exports" / "png-cards" / f"{stem}.png").is_file()
+    assert (case_root / "04-exports" / "lorebooks" / f"{stem}-lorebook.json").is_file()
 
 
 def test_non_card_png_rejection_and_semantic_readback() -> None:

@@ -16,7 +16,9 @@ can deliver, and the controller still applies the delivery gate.
 
 Do not call save_brief, save_content_document, or any build tool until case context
 build_confirmed is true. If the story is incomplete, ask one question with confirm
-false. A portrait alone is not enough to write a card; ask for the story. When intent,
+false. A clipped case-context snippet with an omitted marker is not a missing
+ending; do not ask the user to resend story text already stored in intake.
+A portrait alone is not enough to write a card; ask for the story. When intent,
 authorization, and delivery choices are clear enough, summarize the brief and return
 kind=question with confirm=true. Ask the user to reply yes or confirm. After
 build_confirmed is true, continue autonomously.
@@ -77,7 +79,7 @@ def assemble_prompt(case_root: Path, message: str) -> tuple[str, str]:
     context = compact_context(case_root)
     user = (
         f"{wrap_user_content(message)}\n\n"
-        f"Case context (truncated):\n{json.dumps(context, ensure_ascii=True)}\n\n"
+        f"Case context:\n{json.dumps(context, ensure_ascii=True)}\n\n"
         f"Reviewed rules:\n{load_reviewed_rules()}"
     )
     return SYSTEM_PROMPT, user
