@@ -146,6 +146,63 @@ def test_save_brief_uses_bound_portrait_ref(tmp_path: Path) -> None:
     assert save_brief(**BRIEF_ARGS)["ok"] is True
     text = (case_root / "00-work" / "brief.md").read_text(encoding="utf-8")
     assert "01-assets/portraits/face.png" in text
+    assert "character: both" in text
+
+
+def test_save_brief_png_in_intake_sets_both_without_portrait(tmp_path: Path) -> None:
+    from st_agent.services.workspace import append_intake
+
+    case_root = create_case(tmp_path, "harbor-watch")
+    append_intake(case_root, "User: Make a PNG card for Mara.")
+    authorize_build(case_root)
+    ctx = ToolContext(case_root=case_root, invocation_id="inv-png", operation_id="op-png")
+    save_brief = next(item for item in bind_tools(ctx) if item.tool_name == "save_brief")._tool_func
+    assert save_brief(**BRIEF_ARGS)["ok"] is True
+    text = (case_root / "00-work" / "brief.md").read_text(encoding="utf-8")
+    assert "character: both" in text
+
+
+def test_save_brief_json_only_keeps_json_with_portrait(tmp_path: Path) -> None:
+    from st_agent.services.workspace import append_intake
+
+    case_root = create_case(tmp_path, "harbor-watch")
+    face = tmp_path / "face.png"
+    Image.new("RGB", (4, 4), "navy").save(face)
+    save_user_inputs(case_root, [face])
+    append_intake(case_root, "User: JSON only please.")
+    authorize_build(case_root)
+    ctx = ToolContext(case_root=case_root, invocation_id="inv-j", operation_id="op-j")
+    save_brief = next(item for item in bind_tools(ctx) if item.tool_name == "save_brief")._tool_func
+    assert save_brief(**BRIEF_ARGS)["ok"] is True
+    text = (case_root / "00-work" / "brief.md").read_text(encoding="utf-8")
+    assert "character: json" in text
+
+
+def test_save_brief_later_json_intent_overrides_png(tmp_path: Path) -> None:
+    from st_agent.services.workspace import append_intake
+
+    case_root = create_case(tmp_path, "harbor-watch")
+    append_intake(case_root, "User: I want a PNG card.")
+    append_intake(case_root, "User: Use JSON instead.")
+    authorize_build(case_root)
+    ctx = ToolContext(case_root=case_root, invocation_id="inv-later", operation_id="op-later")
+    save_brief = next(item for item in bind_tools(ctx) if item.tool_name == "save_brief")._tool_func
+    assert save_brief(**BRIEF_ARGS)["ok"] is True
+    text = (case_root / "00-work" / "brief.md").read_text(encoding="utf-8")
+    assert "character: json" in text
+
+
+def test_save_brief_png_filename_is_not_a_format_request(tmp_path: Path) -> None:
+    from st_agent.services.workspace import append_intake
+
+    case_root = create_case(tmp_path, "harbor-watch")
+    append_intake(case_root, "User: Use Demo.png as the face.")
+    authorize_build(case_root)
+    ctx = ToolContext(case_root=case_root, invocation_id="inv-fn", operation_id="op-fn")
+    save_brief = next(item for item in bind_tools(ctx) if item.tool_name == "save_brief")._tool_func
+    assert save_brief(**BRIEF_ARGS)["ok"] is True
+    text = (case_root / "00-work" / "brief.md").read_text(encoding="utf-8")
+    assert "character: json" in text
 
 
 def test_confirm_flag_roundtrips_on_outcome() -> None:

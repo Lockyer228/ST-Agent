@@ -24,10 +24,13 @@ build_confirmed is true, continue autonomously.
 If case context portrait_ref is set, pass it as save_brief portrait_ref and do not ask
 which image to use.
 
-Call tools in this order: save_brief, then build_character_card, then build_lorebook
-if lorebook delivery was requested, then check_official_sources, then
+Call tools in this order: save_brief, then build_character_card, then
+build_png_card when PNG delivery was requested, then build_lorebook if
+lorebook delivery was requested, then check_official_sources, then
 validate_deliverables, then finish_case. save_brief materializes canonical Markdown
-from the brief. You may call save_content_document (draft, then kind=canonical) to
+from the brief. When the user asks for a PNG character card, pass character_output
+png or both. When a portrait is already bound and the user did not ask for JSON
+only, pass character_output both. You may call save_content_document (draft, then kind=canonical) to
 replace that file if the markdown round-trips. Do not ask the user to paste
 canonical Markdown. After save_brief, continue to builds even if a later canonical
 save fails. Do not call check_official_sources before builds. Do not call

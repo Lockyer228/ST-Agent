@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -72,6 +73,8 @@ from st_agent.services.workspace import (
 MAX_FIELD = 8000
 MAX_MARKDOWN = 200_000
 MAX_FORMAT_REPAIRS = 2
+_PNG_TOKEN = re.compile(r"\bpng\b", re.I)
+_PNG_FILENAME = re.compile(r"[\w./\\-]+\.png\b", re.I)
 TOOL_NAMES = (
     "save_brief",
     "save_content_document",
@@ -176,6 +179,48 @@ def _check_portrait_ref(case_root: Path, ref: str) -> dict[str, Any] | None:
     return None
 
 
+def _intake_text(case_root: Path) -> str:
+    path = case_root / WORK_DIR / "intake.md"
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def _message_requests_png(text: str) -> bool:
+    stripped = _PNG_FILENAME.sub(" ", text)
+    return _PNG_TOKEN.search(stripped) is not None
+
+
+def _latest_format_intent(intake: str) -> str | None:
+    intent: str | None = None
+    for raw in intake.splitlines():
+        line = raw.strip()
+        if not line.lower().startswith("user:"):
+            continue
+        body = line.split(":", 1)[-1]
+        if _message_requests_png(body):
+            intent = "png"
+        elif re.search(r"\bjson\b", body, re.I):
+            intent = "json"
+    return intent
+
+
+def _resolve_card_output(case_root: Path, character_output: str, portrait_ref: str) -> str:
+    intake = _intake_text(case_root)
+    intent = _latest_format_intent(intake)
+    if intent == "json":
+        return "json"
+    if character_output in {"png", "both"}:
+        return character_output
+    if intent == "png":
+        return "both"
+    has_portrait = bool(portrait_ref.strip() or load_manifest(case_root).portrait_ref)
+    if has_portrait:
+        return "both"
+    return "json"
+
+
 def _canonical_path(case_root: Path) -> Path:
     return contained_path(case_root, FINAL_DIR, "canonical.md")
 
@@ -252,6 +297,7 @@ def bind_tools(ctx: ToolContext) -> list[Any]:
             return gated
         if not portrait_ref.strip():
             portrait_ref = load_manifest(case_root).portrait_ref or ""
+        character_output = _resolve_card_output(case_root, character_output, portrait_ref)
         fields = (
             experience_goal,
             player_role,

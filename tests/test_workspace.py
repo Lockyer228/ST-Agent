@@ -204,6 +204,7 @@ def test_compact_context_reads_real_files(tmp_path: Path) -> None:
     atomic_write(case_root / "00-work" / "intake.md", "User said hello.")
     ctx = compact_context(case_root)
     assert ctx["phase"] == "setup"
+    assert ctx["delivery"] == "json"
     assert "hello" in ctx["intake"]
     assert isinstance(ctx["files"], list)
 

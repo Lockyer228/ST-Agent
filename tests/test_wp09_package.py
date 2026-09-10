@@ -72,6 +72,7 @@ def test_system_prompt_requires_canonical_roundtrip() -> None:
     assert "round-trip" in SYSTEM_PROMPT
     assert "save_brief" in SYSTEM_PROMPT
     assert "build_character_card" in SYSTEM_PROMPT
+    assert "build_png_card" in SYSTEM_PROMPT
     assert "check_official_sources" in SYSTEM_PROMPT
     assert "validate_deliverables" in SYSTEM_PROMPT
     assert "finish_case" in SYSTEM_PROMPT

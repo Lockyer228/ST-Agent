@@ -28,9 +28,9 @@ Ordinary names, weather, and technical packing are not stop conditions.
 
 ## Delivery defaults
 
-If card format is unanswered, continue with **JSON**. That default does not grant other creative authority and does not block drafting.
+If card format is unanswered, continue with **JSON**. If a portrait is already bound, deliver **both JSON and PNG** unless the user asked for JSON only. A later format choice replaces an earlier one.
 
-A portrait upload is not by itself a PNG request. If PNG is requested and the image is missing, keep writing text and ask only for the image.
+An uploaded image is a portrait, not a finished PNG character card. If PNG is requested and the image is missing, keep writing text and ask only for the image.
 
 If exactly one plain portrait is already bound on the case, use it. Do not ask the user to choose among files.
 

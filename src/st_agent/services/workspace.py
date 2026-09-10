@@ -440,6 +440,7 @@ def compact_context(case_root: Path, max_chars: int = 800) -> dict[str, object]:
         "condition": str(manifest.condition),
         "build_confirmed": manifest.build_confirmed,
         "portrait_ref": manifest.portrait_ref,
+        "delivery": str(manifest.delivery.card),
         "intake": _snippet("intake.md"),
         "brief": _snippet("brief.md"),
         "files": files,
